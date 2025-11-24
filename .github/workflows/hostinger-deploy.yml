@@ -3,18 +3,16 @@ name: Deploy to Hostinger
 on:
   push:
     branches:
-      - main  # Verifique se sua branch principal chama 'main' ou 'master'
+      - main
 
 jobs:
   web-deploy:
     name: 🎉 Deploy
     runs-on: ubuntu-latest
     steps:
-      # 1. PEGAR O CÓDIGO
       - name: 🚚 Get latest code
         uses: actions/checkout@v4
 
-      # 2. INSTALAR E CONSTRUIR O SITE (NEXT.JS)
       - name: 🟢 Install Node.js
         uses: actions/setup-node@v4
         with:
@@ -25,45 +23,29 @@ jobs:
 
       - name: 🏗️ Build Site
         run: npm run build
-        # O Next.js vai gerar a pasta 'out' com o site estático
+        env:
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
 
-      # 3. ORGANIZAR ARQUIVOS PARA ENVIO (MISTURAR HTML + PHP)
-      - name: 🗂️ Prepare Files for Upload
+      - name: 🗂️ Prepare Files
         run: |
-          # Cria a pasta final que vai subir
           mkdir dist
-          
-          # Copia o site estático (HTML/CSS/JS) para a pasta final
           cp -r out/* dist/
-          
-          # Copia a API PHP (backend) para a raiz (junto com o site)
-          # Assim, sua API fica em: asventura.com.br/api_projects.php
           cp backend/*.php dist/
-          
-          # Copia o Painel Admin
           mkdir -p dist/admin
           cp backend/admin/*.php dist/admin/
-          
-          # Cria a pasta de uploads (vazia) para garantir que exista
           mkdir -p dist/uploads
 
-      # 4. ENVIAR PARA HOSTINGER (FTP)
       - name: 🚀 Upload to Hostinger
         uses: SamKirkland/FTP-Deploy-Action@v4.3.4
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          
-          # Pasta local com os arquivos prontos para envio
           local-dir: ./dist/
-          
-          # Pasta na Hostinger onde os arquivos serão enviados
           server-dir: ./test/
-          
-          # Arquivos para ignorar (segurança)
           exclude: |
             **/.git*
+            **/.github*
             **/.env*
             **/node_modules/**
             uploads/**
