@@ -41,17 +41,22 @@ try {
     $pdo->exec($sqlContacts);
     echo "✅ Tabela 'contacts' verificada.<br>";
 
-    // --- 3.1. CRIAR TABELA DE DEFINIÇÃO DE FORMULÁRIOS ---
-    // Aqui ficam os formulários que você criar (Ex: "Contato Principal", "Orçamento")
-    $sqlForms = "CREATE TABLE IF NOT EXISTS forms (
+    // --- 3.1. CRIAR TABELA DE CAMPOS DO FORMULÁRIO ---
+    // Aqui definimos: "Nome", "Email", "Telefone", "Assunto", etc.
+    $sqlFields = "CREATE TABLE IF NOT EXISTS form_fields (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        title VARCHAR(255) NOT NULL,
-        slug VARCHAR(255) NOT NULL UNIQUE, -- Identificador único (ex: contato-home)
-        recipient_email VARCHAR(255) NOT NULL, -- Quem recebe o e-mail
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        form_id INT NOT NULL,
+        label VARCHAR(255) NOT NULL,      -- Ex: "Seu Telefone"
+        name VARCHAR(255) NOT NULL,       -- Ex: "phone" (uso interno/técnico)
+        type VARCHAR(50) NOT NULL,        -- Ex: text, email, textarea, select
+        options TEXT NULL,                -- Ex: "Opção A, Opção B" (só para select)
+        is_required BOOLEAN DEFAULT 0,    -- 1 = Obrigatório
+        sort_order INT DEFAULT 0,         -- Para ordenar os campos
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (form_id) REFERENCES forms(id) ON DELETE CASCADE
     )";
-    $pdo->exec($sqlForms);
-    echo "✅ Tabela 'forms' verificada.<br>";
+    $pdo->exec($sqlFields);
+    echo "✅ Tabela 'form_fields' verificada.<br>";
 
     // --- 3.2. CRIAR TABELA DE ENVIOS (RESPOSTAS) ---
     // Aqui ficam os dados que os clientes preencherem
