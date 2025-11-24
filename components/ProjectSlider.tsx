@@ -6,23 +6,24 @@ import React from 'react';
 import Image from 'next/image';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Navigation, Pagination, Autoplay } from 'swiper/modules';
-import { API_BASE_URL, Project } from '../utils/api';
+import { API_BASE_URL } from '../utils/api';
 
 import 'swiper/css';
 import 'swiper/css/navigation';
 import 'swiper/css/pagination';
 
+interface Project {
+  id: number;
+  title: string;
+  description: string;
+  image_url: string;
+  link: string;
+}
+
 interface ProjectSliderProps {
   data: Project[];
 }
 
-/**
- * Renders a responsive, infinite-loop project carousel.
- * This component handles the logic for resolving local vs external image URLs
- * and utilizes Next.js Image component for optimization where applicable.
- * @param {ProjectSliderProps} props - The list of projects to display.
- * @returns {JSX.Element} The Swiper slider component.
- */
 export default function ProjectSlider({ data }: ProjectSliderProps) {
   return (
     <div className="w-full relative px-4 sm:px-12">
