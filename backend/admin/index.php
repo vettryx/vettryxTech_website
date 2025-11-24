@@ -2,15 +2,21 @@
 session_start();
 require_once __DIR__ . '/../config.php';
 
+// Verifica se está logado
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     header('Location: login.php');
     exit;
 }
 
-// Lógica para obter dados do dashboard, se necessário
-$total_projects = $pdo->query('SELECT COUNT(*) FROM projects')->fetchColumn();
-$new_contacts = $pdo->query("SELECT COUNT(*) FROM contacts WHERE status = 'Novo'")->fetchColumn();
-
+// Lógica para obter dados do dashboard
+// Usa try/catch para evitar que a página quebre se o banco estiver vazio ou com erro
+try {
+    $total_projects = $pdo->query('SELECT COUNT(*) FROM projects')->fetchColumn();
+    $new_contacts = $pdo->query("SELECT COUNT(*) FROM contacts WHERE status = 'Novo'")->fetchColumn();
+} catch (Exception $e) {
+    $total_projects = 0;
+    $new_contacts = 0;
+}
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -40,7 +46,8 @@ $new_contacts = $pdo->query("SELECT COUNT(*) FROM contacts WHERE status = 'Novo'
         </div>
     </div>
     <div class="container">
-        <h2>Bem-vindo, <?php echo ADMIN_USER; ?>!</h2>
+        <h2>Bem-vindo, <?php echo htmlspecialchars($_SESSION['admin_email']); ?>!</h2>
+        
         <div class="stats">
             <div class="stat-box">
                 <h3>Total de Projetos</h3>

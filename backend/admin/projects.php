@@ -1,166 +1,216 @@
 <?php
-session_start();
-require_once __DIR__ . '/../config.php';
+require 'auth.php';
+require '../config.php';
 
-if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
-    header('Location: login.php');
+$msg = "";
+$projectToEdit = null; // Variável para guardar os dados quando for edição
+
+// --- 1. LÓGICA DE CADASTRO E EDIÇÃO (POST) ---
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $action = $_POST['action'];
+    
+    $title = $_POST['title'];
+    $desc  = $_POST['description'];
+    $link  = $_POST['link'];
+    $id    = $_POST['id'] ?? null; // ID só existe na edição
+    
+    // --- TRATAMENTO DA IMAGEM ---
+    $final_image_url = "";
+
+    // A. Usuário fez upload de NOVA imagem?
+    if (isset($_FILES['image_file']) && $_FILES['image_file']['error'] === 0) {
+        $upload_dir = '../uploads/';
+        $filename = time() . '_' . basename($_FILES['image_file']['name']);
+        if (move_uploaded_file($_FILES['image_file']['tmp_name'], $upload_dir . $filename)) {
+            $final_image_url = '/uploads/' . $filename;
+        }
+    } 
+    // B. Usuário colou um NOVO link?
+    elseif (!empty($_POST['image_url'])) {
+        $final_image_url = $_POST['image_url'];
+    }
+    // C. (Só Edição) Nenhuma nova imagem? Mantém a antiga (hidden field)
+    elseif ($action === 'update' && !empty($_POST['existing_image'])) {
+        $final_image_url = $_POST['existing_image'];
+    }
+
+    // --- EXECUÇÃO NO BANCO ---
+    if ($action === 'create') {
+        // INSERIR NOVO
+        if ($final_image_url) {
+            $sql = "INSERT INTO projects (title, description, link, image_url) VALUES (?, ?, ?, ?)";
+            $stmt = $pdo->prepare($sql);
+            if ($stmt->execute([$title, $desc, $link, $final_image_url])) {
+                $msg = "✅ Project created successfully!";
+            }
+        } else {
+            $msg = "⚠️ Image is required for new projects.";
+        }
+    } 
+    elseif ($action === 'update' && $id) {
+        // ATUALIZAR EXISTENTE
+        $sql = "UPDATE projects SET title=?, description=?, link=?, image_url=? WHERE id=?";
+        $stmt = $pdo->prepare($sql);
+        if ($stmt->execute([$title, $desc, $link, $final_image_url, $id])) {
+            $msg = "✅ Project updated successfully!";
+            // Limpa a variável de edição para voltar ao modo "Novo"
+            $projectToEdit = null; 
+        } else {
+            $msg = "❌ Error updating project.";
+        }
+    }
+}
+
+// --- 2. LÓGICA DE EXCLUSÃO ---
+if (isset($_GET['delete'])) {
+    $id = $_GET['delete'];
+    $stmt = $pdo->prepare("DELETE FROM projects WHERE id = ?");
+    $stmt->execute([$id]);
+    header("Location: projects.php");
     exit;
 }
 
-$message = '';
-$action = $_GET['action'] ?? 'list';
-$id = $_GET['id'] ?? null;
-
-// Lógica de Ações (Adicionar, Editar, Excluir)
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $title = $_POST['title'] ?? '';
-    $description = $_POST['description'] ?? '';
-    $image_url = $_POST['image_url'] ?? '';
-    $link = $_POST['link'] ?? '';
-
-    if ($action === 'add') {
-        try {
-            $stmt = $pdo->prepare('INSERT INTO projects (title, description, image_url, link) VALUES (?, ?, ?, ?)');
-            $stmt->execute([$title, $description, $image_url, $link]);
-            $message = 'Projeto adicionado com sucesso!';
-            $action = 'list';
-        } catch (PDOException $e) {
-            $message = 'Erro ao adicionar projeto: ' . $e->getMessage();
-        }
-    } elseif ($action === 'edit' && $id) {
-        try {
-            $stmt = $pdo->prepare('UPDATE projects SET title = ?, description = ?, image_url = ?, link = ? WHERE id = ?');
-            $stmt->execute([$title, $description, $image_url, $link, $id]);
-            $message = 'Projeto atualizado com sucesso!';
-            $action = 'list';
-        } catch (PDOException $e) {
-            $message = 'Erro ao atualizar projeto: ' . $e->getMessage();
-        }
-    }
-} elseif ($action === 'delete' && $id) {
-    try {
-        $stmt = $pdo->prepare('DELETE FROM projects WHERE id = ?');
-        $stmt->execute([$id]);
-        $message = 'Projeto excluído com sucesso!';
-        $action = 'list';
-    } catch (PDOException $e) {
-        $message = 'Erro ao excluir projeto: ' . $e->getMessage();
-    }
-}
-
-// Lógica de Visualização
-$projects = [];
-$project_data = ['title' => '', 'description' => '', 'image_url' => '', 'link' => ''];
-
-if ($action === 'list') {
-    $projects = $pdo->query('SELECT * FROM projects ORDER BY created_at DESC')->fetchAll(PDO::FETCH_ASSOC);
-} elseif ($action === 'edit' && $id) {
-    $stmt = $pdo->prepare('SELECT * FROM projects WHERE id = ?');
+// --- 3. LÓGICA DE CARREGAR PARA EDITAR ---
+if (isset($_GET['edit'])) {
+    $id = $_GET['edit'];
+    $stmt = $pdo->prepare("SELECT * FROM projects WHERE id = ?");
     $stmt->execute([$id]);
-    $project_data = $stmt->fetch(PDO::FETCH_ASSOC);
-    if (!$project_data) {
-        $message = 'Projeto não encontrado.';
-        $action = 'list';
-    }
+    $projectToEdit = $stmt->fetch(PDO::FETCH_ASSOC);
 }
 
+// --- 4. BUSCAR TODOS (PARA A LISTA) ---
+$stmt = $pdo->query("SELECT * FROM projects ORDER BY created_at DESC");
+$projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
+
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gerenciar Projetos - Painel Admin</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 0; background-color: #f4f4f4; }
-        .header { background-color: #333; color: white; padding: 15px; display: flex; justify-content: space-between; align-items: center; }
-        .header a { color: white; text-decoration: none; margin-left: 20px; }
-        .header a:hover { text-decoration: underline; }
-        .container { padding: 20px; }
-        .message { padding: 10px; margin-bottom: 20px; border-radius: 4px; background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-        .form-group { margin-bottom: 15px; }
-        label { display: block; margin-bottom: 5px; font-weight: bold; }
-        input[type="text"], textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        button { padding: 10px 15px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
-        button:hover { background-color: #0056b3; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; background-color: white; }
-        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-        th { background-color: #f2f2f2; }
-        .actions a { margin-right: 10px; text-decoration: none; color: #007bff; }
-        .actions a:hover { text-decoration: underline; }
-    </style>
+    <title>Manage Projects</title>
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-    <div class="header">
-        <h1>Gerenciar Projetos</h1>
+<body class="bg-gray-100 min-h-screen pb-10">
+
+    <nav class="bg-white shadow p-4 mb-8 flex justify-between items-center">
+        <h1 class="text-xl font-bold text-gray-800">📂 Manage Projects</h1>
         <div>
-            <a href="index.php">Dashboard</a>
-            <a href="contacts.php">Contatos</a>
-            <a href="logout.php">Sair</a>
+            <a href="projects.php" class="text-gray-600 hover:text-blue-600 mr-4 text-sm font-bold">New Project</a>
+            <a href="index.php" class="text-blue-600 hover:underline text-sm">← Dashboard</a>
         </div>
-    </div>
-    <div class="container">
-        <?php if ($message): ?>
-            <div class="message"><?php echo $message; ?></div>
+    </nav>
+
+    <div class="container mx-auto p-4 max-w-4xl">
+        
+        <?php if($msg): ?>
+            <div class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4 mb-4">
+                <?php echo $msg; ?>
+            </div>
         <?php endif; ?>
 
-        <?php if ($action === 'list'): ?>
-            <h2>Lista de Projetos</h2>
-            <p><a href="?action=add"><button>+ Adicionar Novo Projeto</button></a></p>
-            <?php if (count($projects) > 0): ?>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Título</th>
-                            <th>Link</th>
-                            <th>Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($projects as $project): ?>
-                            <tr>
-                                <td><?php echo $project['id']; ?></td>
-                                <td><?php echo htmlspecialchars($project['title']); ?></td>
-                                <td><a href="<?php echo htmlspecialchars($project['link']); ?>" target="_blank"><?php echo htmlspecialchars($project['link']); ?></a></td>
-                                <td class="actions">
-                                    <a href="?action=edit&id=<?php echo $project['id']; ?>">Editar</a>
-                                    <a href="?action=delete&id=<?php echo $project['id']; ?>" onclick="return confirm('Tem certeza que deseja excluir este projeto?');">Excluir</a>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            <?php else: ?>
-                <p>Nenhum projeto cadastrado ainda.</p>
-            <?php endif; ?>
-
-        <?php elseif ($action === 'add' || $action === 'edit'): ?>
-            <h2><?php echo $action === 'add' ? 'Adicionar Novo Projeto' : 'Editar Projeto'; ?></h2>
-            <form method="POST">
-                <?php if ($action === 'edit'): ?>
-                    <input type="hidden" name="id" value="<?php echo $id; ?>">
+        <div class="bg-white p-6 rounded-lg shadow-md mb-8 border-t-4 <?php echo $projectToEdit ? 'border-yellow-400' : 'border-blue-500'; ?>">
+            <h2 class="text-lg font-bold mb-4 border-b pb-2">
+                <?php echo $projectToEdit ? '✏️ Edit Project' : '✨ New Project'; ?>
+            </h2>
+            
+            <form method="POST" enctype="multipart/form-data" class="grid grid-cols-1 gap-4">
+                <input type="hidden" name="action" value="<?php echo $projectToEdit ? 'update' : 'create'; ?>">
+                
+                <?php if ($projectToEdit): ?>
+                    <input type="hidden" name="id" value="<?php echo $projectToEdit['id']; ?>">
+                    <input type="hidden" name="existing_image" value="<?php echo $projectToEdit['image_url']; ?>">
                 <?php endif; ?>
-                <div class="form-group">
-                    <label for="title">Título:</label>
-                    <input type="text" id="title" name="title" value="<?php echo htmlspecialchars($project_data['title']); ?>" required>
+
+                <div>
+                    <label class="block text-sm font-bold text-gray-700">Project Name / Client</label>
+                    <input type="text" name="title" required 
+                           value="<?php echo $projectToEdit['title'] ?? ''; ?>"
+                           class="w-full p-2 border rounded mt-1 focus:ring-2 focus:ring-blue-500">
                 </div>
-                <div class="form-group">
-                    <label for="description">Descrição:</label>
-                    <textarea id="description" name="description" rows="5"><?php echo htmlspecialchars($project_data['description']); ?></textarea>
+
+                <div>
+                    <label class="block text-sm font-bold text-gray-700">Description</label>
+                    <textarea name="description" rows="3" class="w-full p-2 border rounded mt-1"><?php echo $projectToEdit['description'] ?? ''; ?></textarea>
                 </div>
-                <div class="form-group">
-                    <label for="image_url">URL da Imagem (Ex: /images/projeto.jpg):</label>
-                    <input type="text" id="image_url" name="image_url" value="<?php echo htmlspecialchars($project_data['image_url']); ?>">
+
+                <div>
+                    <label class="block text-sm font-bold text-gray-700">Project Link</label>
+                    <input type="text" name="link" 
+                           value="<?php echo $projectToEdit['link'] ?? ''; ?>"
+                           class="w-full p-2 border rounded mt-1">
                 </div>
-                <div class="form-group">
-                    <label for="link">Link do Projeto (URL):</label>
-                    <input type="text" id="link" name="link" value="<?php echo htmlspecialchars($project_data['link']); ?>">
+
+                <div class="bg-gray-50 p-4 rounded border border-gray-200">
+                    <label class="block text-sm font-bold text-gray-700 mb-2">Project Image</label>
+                    
+                    <?php if ($projectToEdit): ?>
+                        <div class="mb-4 flex items-center gap-4">
+                            <span class="text-xs text-gray-500">Current Image:</span>
+                            <img src="<?php echo strpos($projectToEdit['image_url'], 'http') === 0 ? $projectToEdit['image_url'] : 'http://localhost:8000'.$projectToEdit['image_url']; ?>" class="h-12 w-12 object-cover rounded border">
+                            <span class="text-xs text-yellow-600 font-bold">(Leave blank below to keep this image)</span>
+                        </div>
+                    <?php endif; ?>
+
+                    <div class="mb-3">
+                        <span class="text-xs font-semibold text-gray-500 uppercase">Option A: Upload New File</span>
+                        <input type="file" name="image_file" accept="image/*" class="block w-full text-sm mt-1"/>
+                    </div>
+                    <div class="text-center text-gray-400 text-xs my-2">- OR -</div>
+                    <div>
+                        <span class="text-xs font-semibold text-gray-500 uppercase">Option B: New External URL</span>
+                        <input type="text" name="image_url" placeholder="https://..." class="w-full p-2 border rounded mt-1 text-sm">
+                    </div>
                 </div>
-                <button type="submit"><?php echo $action === 'add' ? 'Adicionar' : 'Salvar Alterações'; ?></button>
-                <a href="projects.php"><button type="button">Cancelar</button></a>
+
+                <div class="flex gap-2">
+                    <button type="submit" class="flex-1 <?php echo $projectToEdit ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-blue-600 hover:bg-blue-700'; ?> text-white font-bold py-3 px-4 rounded transition">
+                        <?php echo $projectToEdit ? 'Save Changes' : '+ Create Project'; ?>
+                    </button>
+                    
+                    <?php if ($projectToEdit): ?>
+                        <a href="projects.php" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-3 px-4 rounded text-center">
+                            Cancel
+                        </a>
+                    <?php endif; ?>
+                </div>
             </form>
-        <?php endif; ?>
+        </div>
+
+        <h2 class="text-xl font-bold mb-4">Existing Projects</h2>
+        <div class="grid gap-4">
+            <?php foreach($projects as $proj): ?>
+                <div class="bg-white p-4 rounded shadow flex flex-col md:flex-row gap-4 items-center">
+                    
+                    <div class="w-full md:w-24 h-24 bg-gray-200 rounded overflow-hidden flex-shrink-0">
+                        <?php 
+                            $imgSrc = strpos($proj['image_url'], 'http') === 0 
+                                      ? $proj['image_url'] 
+                                      : 'http://localhost:8000' . $proj['image_url'];
+                        ?>
+                        <img src="<?php echo htmlspecialchars($imgSrc); ?>" alt="Project" class="w-full h-full object-cover">
+                    </div>
+
+                    <div class="flex-grow">
+                        <h3 class="font-bold text-lg"><?php echo htmlspecialchars($proj['title']); ?></h3>
+                        <p class="text-gray-600 text-sm mb-1"><?php echo htmlspecialchars($proj['description']); ?></p>
+                    </div>
+                    
+                    <div class="flex gap-2">
+                        <a href="?edit=<?php echo $proj['id']; ?>" 
+                           class="bg-yellow-100 text-yellow-700 px-3 py-2 rounded hover:bg-yellow-200 text-sm font-bold border border-yellow-200">
+                           ✏️ Edit
+                        </a>
+
+                        <a href="?delete=<?php echo $proj['id']; ?>" 
+                           onclick="return confirm('Are you sure?')"
+                           class="bg-red-100 text-red-600 px-3 py-2 rounded hover:bg-red-200 text-sm font-bold border border-red-200">
+                           🗑️ Delete
+                        </a>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        </div>
+
     </div>
 </body>
 </html>
