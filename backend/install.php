@@ -41,6 +41,31 @@ try {
     $pdo->exec($sqlContacts);
     echo "✅ Tabela 'contacts' verificada.<br>";
 
+    // --- 3.1. CRIAR TABELA DE DEFINIÇÃO DE FORMULÁRIOS ---
+    // Aqui ficam os formulários que você criar (Ex: "Contato Principal", "Orçamento")
+    $sqlForms = "CREATE TABLE IF NOT EXISTS forms (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        slug VARCHAR(255) NOT NULL UNIQUE, -- Identificador único (ex: contato-home)
+        recipient_email VARCHAR(255) NOT NULL, -- Quem recebe o e-mail
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )";
+    $pdo->exec($sqlForms);
+    echo "✅ Tabela 'forms' verificada.<br>";
+
+    // --- 3.2. CRIAR TABELA DE ENVIOS (RESPOSTAS) ---
+    // Aqui ficam os dados que os clientes preencherem
+    $sqlSubmissions = "CREATE TABLE IF NOT EXISTS form_submissions (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        form_id INT NOT NULL,
+        data JSON NOT NULL, -- Salva qualquer campo enviado em formato JSON
+        email_status VARCHAR(50) DEFAULT 'Pendente',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (form_id) REFERENCES forms(id) ON DELETE CASCADE
+    )";
+    $pdo->exec($sqlSubmissions);
+    echo "✅ Tabela 'form_submissions' verificada.<br>";
+
     // --- 4. CRIAR O ADMIN INICIAL (Baseado no .env) ---
     // Pega as variáveis do ambiente (ou usa um padrão se esquecerem de por no .env)
     $email = getenv('DEFAULT_ADMIN_EMAIL') ?: 'admin@admin.com';
