@@ -1,26 +1,61 @@
 @import "tailwindcss";
 
+/* --- 1. CONFIGURAÇÃO GERAL --- */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* Garante que o fundo seja sempre o Azul Escuro da sua marca */
+  --background: #023047;
+  --foreground: #ffffff;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: #023047; /* Azul Profundo */
+  color: #ffffff;            /* Texto Branco */
+  
+  /* AQUI APLICAMOS A FONTE MONTSERRAT COMO PADRÃO NO CORPO */
+  font-family: var(--font-montserrat), sans-serif;
+  
+  overflow-x: hidden;
+}
+
+/* --- 2. FORÇAR RAJDHANI NOS TÍTULOS --- */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-rajdhani), sans-serif;
+}
+
+/* --- 3. ESTILOS DO SWIPER (CARROSSEL) --- */
+.swiper-button-next,
+.swiper-button-prev {
+  background-color: #2ECC40 !important; /* Verde Neon */
+  color: #023047 !important;            /* Seta Azul Escura */
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  transition: transform 0.2s;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+  z-index: 50;
+}
+
+.swiper-button-next:hover,
+.swiper-button-prev:hover {
+  transform: scale(1.1);
+  background-color: #ffffff !important;
+}
+
+.swiper-button-next::after,
+.swiper-button-prev::after {
+  font-size: 18px !important;
+  font-weight: 900;
+}
+
+/* Paginação (Bolinhas) */
+.swiper-pagination-bullet {
+  background-color: #ffffff;
+  opacity: 0.3;
+}
+.swiper-pagination-bullet-active {
+  background-color: #2ECC40 !important;
+  opacity: 1;
+  width: 20px;
+  border-radius: 6px;
+  transition: width 0.3s;
 }
