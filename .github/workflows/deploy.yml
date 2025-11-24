@@ -59,7 +59,7 @@ jobs:
           local-dir: ./dist/
           
           # Pasta na Hostinger (Geralmente é public_html)
-          server-dir: /public_html/
+          server-dir: ./domains/asventura.com.br/public_html/
           
           # Arquivos para ignorar (segurança)
           exclude: |
