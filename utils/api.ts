@@ -1,9 +1,7 @@
 // utils/api.ts
 
 // Define a URL base dependendo se está no seu PC ou na Hostinger
-const API_BASE_URL = process.env.NODE_ENV === 'development'
-  ? 'http://localhost:8000' // Docker/Local
-  : 'https://asventura.com.br'; // Produção
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export interface Project {
   id: number;
