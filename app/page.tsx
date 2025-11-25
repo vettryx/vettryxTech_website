@@ -1,6 +1,7 @@
 import Image from 'next/image';
 // Importamos o novo componente inteligente
 import ProjectsArea from '../components/ProjectsArea';
+import DynamicForm from '../components/DynamicForm';
 
 export default function Home() {
   // Removemos toda aquela lógica de getProjects daqui. 
@@ -84,25 +85,10 @@ export default function Home() {
             <h2 className="text-4xl font-bold text-center mb-10 text-white uppercase font-rajdhani">
               Vamos conversar?
             </h2>
-            <form className="space-y-6 bg-brand-dark p-8 sm:p-12 rounded-xl border border-white/5 shadow-2xl">
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-bold text-brand-blue mb-2 uppercase font-rajdhani">Nome</label>
-                    <input type="text" className="w-full bg-[#012233] border border-white/10 text-white rounded p-4 focus:outline-none focus:border-brand-green focus:ring-1 focus:ring-brand-green transition-all" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-brand-blue mb-2 uppercase font-rajdhani">Email</label>
-                    <input type="email" className="w-full bg-[#012233] border border-white/10 text-white rounded p-4 focus:outline-none focus:border-brand-green focus:ring-1 focus:ring-brand-green transition-all" />
-                  </div>
-               </div>
-              <div>
-                <label className="block text-sm font-bold text-brand-blue mb-2 uppercase font-rajdhani">Mensagem</label>
-                <textarea rows={4} className="w-full bg-[#012233] border border-white/10 text-white rounded p-4 focus:outline-none focus:border-brand-green focus:ring-1 focus:ring-brand-green transition-all"></textarea>
-              </div>
-              <button type="button" className="w-full py-4 px-6 bg-brand-green hover:bg-white hover:text-brand-dark text-brand-dark font-bold uppercase tracking-widest rounded transition-all shadow-lg hover:shadow-brand-green/20 font-rajdhani">
-                Enviar Mensagem (Em breve)
-              </button>
-            </form>
+            
+            {/* Passando o SLUG que você criou no Admin */}
+            <DynamicForm slug="contact-form-main" />
+            
           </div>
         </section>
 
