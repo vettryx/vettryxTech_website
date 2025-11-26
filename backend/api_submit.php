@@ -1,102 +1,83 @@
 <?php
 require 'config.php';
 
-// 1. CORS
+// CORS
 if (isset($_SERVER['HTTP_ORIGIN'])) {
     header("Access-Control-Allow-Origin: {$_SERVER['HTTP_ORIGIN']}");
     header('Access-Control-Allow-Credentials: true');
     header('Access-Control-Max-Age: 86400');
 }
 if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
-    if (isset($_SERVER['HTTP_ACCESS_CONTROL_REQUEST_METHOD']))
-        header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
-    if (isset($_SERVER['HTTP_ACCESS_CONTROL_REQUEST_HEADERS']))
-        header("Access-Control-Allow-Headers: {$_SERVER['HTTP_ACCESS_CONTROL_REQUEST_HEADERS']}");
+    if (isset($_SERVER['HTTP_ACCESS_CONTROL_REQUEST_METHOD'])) header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
+    if (isset($_SERVER['HTTP_ACCESS_CONTROL_REQUEST_HEADERS'])) header("Access-Control-Allow-Headers: {$_SERVER['HTTP_ACCESS_CONTROL_REQUEST_HEADERS']}");
     exit(0);
 }
 
 header("Content-Type: application/json; charset=UTF-8");
 
-// 2. Recebe dados
 $input = json_decode(file_get_contents("php://input"), true);
 $form_id = $input['form_id'] ?? null;
 $formData = $input['data'] ?? [];
 
 try {
-    // 3. Busca destino
+    // Busca Formulário
     $stmtForm = $pdo->prepare("SELECT title, recipient_email FROM forms WHERE id = ?");
     $stmtForm->execute([$form_id]);
     $formInfo = $stmtForm->fetch(PDO::FETCH_ASSOC);
 
     if (!$formInfo) throw new Exception("Formulário não encontrado.");
 
-    // 4. Salva no Banco
+    // Salva no Banco
     $jsonData = json_encode($formData, JSON_UNESCAPED_UNICODE);
     $stmt = $pdo->prepare("INSERT INTO form_submissions (form_id, data, email_status) VALUES (?, ?, ?)");
     $stmt->execute([$form_id, $jsonData, 'Pendente']);
     $submission_id = $pdo->lastInsertId();
 
-    // --- 5. ENVIO DE E-MAIL NATIVO (BLINDADO) ---
+    // --- ENVIO BLINDADO PARA OUTLOOK ---
     
     $para = $formInfo['recipient_email'];
-    $assunto = "Novo Contato: " . $formInfo['title'];
+    $assunto = "Novo Lead: " . $formInfo['title'];
     
-    // Define o remetente oficial
-    // IMPORTANTE: Use um e-mail que 'pareça' real do domínio
-    $emailSistema = "no-reply@asventura.com.br"; 
-    $nomeSite = "Site Andre Ventura"; // Sem acentos no código pra garantir compatibilidade máxima
+    // E-mail de sistema (validado no SPF)
+    $emailFrom = "no-reply@asventura.com.br";
+    $nomeFrom = "Site Andre Ventura";
 
-    // Corpo do E-mail
+    // Corpo
     $mensagem = "
     <html>
-    <body style='font-family: Arial, sans-serif; color: #333;'>
-      <div style='background-color: #f9f9f9; padding: 20px; border: 1px solid #ddd;'>
-        <h2 style='color: #023047; margin-top: 0;'>Novo Lead: {$formInfo['title']}</h2>
-        <hr style='border: 0; border-top: 1px solid #ccc; margin: 20px 0;'>
+    <body style='font-family: Arial, sans-serif;'>
+      <div style='border-left: 4px solid #2ECC40; padding-left: 15px;'>
+        <h3 style='color: #023047;'>Novo contato recebido</h3>
     ";
-    
     foreach ($formData as $key => $value) {
         $label = ucwords(str_replace('_', ' ', $key));
         $val = htmlspecialchars($value);
-        $mensagem .= "<p style='margin: 10px 0;'><strong>$label:</strong><br>$val</p>";
+        $mensagem .= "<p><strong>$label:</strong> $val</p>";
     }
-    
-    $mensagem .= "
-        <hr style='border: 0; border-top: 1px solid #ccc; margin: 20px 0;'>
-        <p style='font-size: 12px; color: #999;'>Enviado via formulário do site.</p>
-      </div>
-    </body>
-    </html>
-    ";
+    $mensagem .= "</div></body></html>";
 
-    // CABEÇALHOS ESPECIAIS (PARA MATAR O 'EM NOME DE')
-    // O segredo é alinhar o FROM, o SENDER e o RETURN-PATH
-    
+    // --- CABEÇALHOS (A CORREÇÃO ESTÁ AQUI) ---
+    // O segredo é alinhar From, Reply-To, Sender e Return-Path
     $headers  = "MIME-Version: 1.0" . "\r\n";
     $headers .= "Content-type: text/html; charset=UTF-8" . "\r\n";
     
-    // Remetente
-    $headers .= "From: $nomeSite <$emailSistema>" . "\r\n";
+    // 1. Quem está mandando (Visual)
+    $headers .= "From: $nomeFrom <$emailFrom>" . "\r\n";
     
-    // Força o servidor a entender que quem manda é o domínio, não o usuário Linux
-    $headers .= "Sender: $emailSistema" . "\r\n";
-    $headers .= "Return-Path: $emailSistema" . "\r\n";
-    $headers .= "X-Sender: $emailSistema" . "\r\n";
-    $headers .= "X-Priority: 1 (Highest)" . "\r\n"; // Tenta furar o filtro de spam
+    // 2. Quem mandou tecnicamente (Para tirar o 'em nome de')
+    $headers .= "Sender: $emailFrom" . "\r\n";
+    $headers .= "Return-Path: $emailFrom" . "\r\n";
     
+    // 3. Para onde vai a resposta (Cliente)
     if (!empty($formData['email'])) {
         $headers .= "Reply-To: " . $formData['email'] . "\r\n";
     }
 
-    // Parâmetro -f (Envelope Sender)
-    // Isso é OBRIGATÓRIO para o SPF da Hostinger funcionar
-    $parametros = "-f$emailSistema";
-
-    // Força configuração do PHP para este envio
-    ini_set('sendmail_from', $emailSistema);
+    // Parâmetro do envelope (Técnico)
+    $params = "-f" . $emailFrom;
 
     // Envia
-    $enviou = mail($para, $assunto, $mensagem, $headers, $parametros);
+    $enviou = mail($para, $assunto, $mensagem, $headers, $params);
 
     // Atualiza status
     $statusFinal = $enviou ? 'Enviado' : 'Falha Local';
