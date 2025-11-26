@@ -1,10 +1,10 @@
 <?php
-// backend/admin/submissions.php
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
 
 require 'auth.php';
 require '../config.php';
 
-// 1. Validação do ID
 $form_id = $_GET['form_id'] ?? null;
 
 if (!$form_id) {
@@ -12,91 +12,186 @@ if (!$form_id) {
     exit;
 }
 
-// 2. Busca informações do formulário (só pra mostrar o título)
+// Busca Formulário
 $stmt = $pdo->prepare("SELECT title FROM forms WHERE id = ?");
 $stmt->execute([$form_id]);
-$form = $stmt->fetch();
+$form = $stmt->fetch(PDO::FETCH_ASSOC);
 
-if (!$form) {
-    die("Formulário não encontrado.");
-}
+if (!$form) die("Formulário não encontrado.");
 
-// 3. Busca as mensagens (Submissões)
+// Busca Mensagens
 $stmtSub = $pdo->prepare("SELECT * FROM form_submissions WHERE form_id = ? ORDER BY created_at DESC");
 $stmtSub->execute([$form_id]);
 $submissions = $stmtSub->fetchAll(PDO::FETCH_ASSOC);
+
+// Define colunas dinâmicas
+$dynamic_columns = [];
+if (count($submissions) > 0) {
+    $first_data = json_decode($submissions[0]['data'], true);
+    if (is_array($first_data)) {
+        $dynamic_columns = array_keys($first_data);
+    }
+}
 ?>
 
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Mensagens - <?php echo htmlspecialchars($form['title']); ?></title>
+    <title>Relatório - <?php echo htmlspecialchars($form['title']); ?></title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100 min-h-screen pb-10">
 
-    <nav class="bg-white shadow p-4 mb-8 flex justify-between items-center">
-        <div>
-            <span class="text-xs text-gray-500 uppercase">Mensagens recebidas:</span>
+    <nav class="bg-white shadow p-4 mb-8 flex justify-between items-center sticky top-0 z-10">
+        <div class="flex flex-col">
+            <span class="text-xs text-gray-500 uppercase">Relatório de Envios</span>
             <h1 class="text-xl font-bold text-gray-800"><?php echo htmlspecialchars($form['title']); ?></h1>
         </div>
-        <a href="forms.php" class="text-blue-600 hover:underline">← Voltar</a>
+        <a href="forms.php" class="text-blue-600 hover:underline text-sm font-bold">← Voltar</a>
     </nav>
 
-    <div class="container mx-auto p-4 max-w-3xl">
+    <div class="container mx-auto p-4 max-w-7xl">
         
-        <div class="mb-4 text-gray-500 text-sm text-right">
-            Total: <strong><?php echo count($submissions); ?></strong> mensagens
+        <div class="mb-4 flex justify-between items-center">
+            <span class="text-sm text-gray-600">Total: <strong><?php echo count($submissions); ?></strong> registros</span>
         </div>
 
         <?php if(empty($submissions)): ?>
-            <div class="bg-white p-10 rounded shadow text-center text-gray-400">
-                <p class="text-xl mb-2">📭 Nenhuma mensagem ainda.</p>
-                <p class="text-sm">Preencha o formulário no site para testar.</p>
+            <div class="bg-white p-12 rounded shadow text-center border border-dashed border-gray-300">
+                <p class="text-gray-400 text-lg">📭 Nenhuma mensagem recebida.</p>
             </div>
         <?php else: ?>
             
-            <div class="space-y-4">
-                <?php foreach($submissions as $sub): 
-                    // AQUI A MÁGICA: Transforma o texto JSON em Array PHP
-                    $data = json_decode($sub['data'], true);
-                ?>
-                    <div class="bg-white p-6 rounded-lg shadow border-l-4 <?php echo $sub['email_status'] == 'Enviado' ? 'border-green-500' : 'border-red-500'; ?> hover:shadow-md transition">
-                        
-                        <div class="flex justify-between items-center mb-4 pb-2 border-b border-gray-100">
-                            <span class="text-sm text-gray-500 font-mono">
-                                📅 <?php echo date('d/m/Y H:i', strtotime($sub['created_at'])); ?>
-                            </span>
+            <div class="bg-white rounded-lg shadow overflow-hidden overflow-x-auto">
+                <table class="min-w-full text-sm text-left text-gray-600">
+                    <thead class="bg-gray-800 text-white uppercase font-bold text-xs">
+                        <tr>
+                            <th class="px-4 py-3 w-10 text-center">Ver</th>
+                            <th class="px-4 py-3 w-32">Data</th>
+                            <th class="px-4 py-3 w-24 text-center">Status</th>
                             
-                            <span class="text-xs font-bold px-2 py-1 rounded <?php echo $sub['email_status'] == 'Enviado' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'; ?>">
-                                Email: <?php echo $sub['email_status']; ?>
-                            </span>
-                        </div>
+                            <?php foreach($dynamic_columns as $col): ?>
+                                <th class="px-4 py-3 max-w-xs truncate">
+                                    <?php echo str_replace('_', ' ', $col); ?>
+                                </th>
+                            <?php endforeach; ?>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200 bg-white">
+                        <?php foreach($submissions as $sub): 
+                            $data = json_decode($sub['data'], true);
+                            $jsonDataSafe = htmlspecialchars($sub['data'], ENT_QUOTES, 'UTF-8'); // Prepara dados para o JS
+                            $statusColor = ($sub['email_status'] === 'Enviado') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
+                        ?>
+                        <tr class="hover:bg-blue-50 transition">
+                            
+                            <td class="px-4 py-3 text-center">
+                                <button onclick='openModal(<?php echo $jsonDataSafe; ?>, "<?php echo $sub['created_at']; ?>", "<?php echo $sub['email_status']; ?>")' 
+                                        class="bg-blue-500 hover:bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center shadow transition" title="Ver Detalhes Completo">
+                                    👁️
+                                </button>
+                            </td>
 
-                        <div class="grid grid-cols-1 gap-3">
-                            <?php if (is_array($data)): ?>
-                                <?php foreach($data as $key => $value): ?>
-                                    <div>
-                                        <strong class="block text-xs text-gray-400 uppercase tracking-wide mb-1">
-                                            <?php echo str_replace('_', ' ', $key); // Ex: seu_nome -> seu nome ?>
-                                        </strong>
-                                        <div class="text-gray-800 whitespace-pre-wrap bg-gray-50 p-2 rounded border border-gray-100">
-                                            <?php echo nl2br(htmlspecialchars($value)); ?>
-                                        </div>
-                                    </div>
-                                <?php endforeach; ?>
-                            <?php else: ?>
-                                <p class="text-red-500">Erro ao ler dados (JSON inválido).</p>
-                            <?php endif; ?>
-                        </div>
+                            <td class="px-4 py-3 whitespace-nowrap font-mono text-gray-500">
+                                <?php echo date('d/m/y H:i', strtotime($sub['created_at'])); ?>
+                            </td>
 
-                    </div>
-                <?php endforeach; ?>
+                            <td class="px-4 py-3 text-center">
+                                <span class="px-2 py-1 rounded-full text-xs font-bold <?php echo $statusColor; ?>">
+                                    <?php echo $sub['email_status']; ?>
+                                </span>
+                            </td>
+
+                            <?php foreach($dynamic_columns as $col): ?>
+                                <td class="px-4 py-3 max-w-[150px] truncate text-gray-700">
+                                    <?php echo htmlspecialchars($data[$col] ?? '-'); ?>
+                                </td>
+                            <?php endforeach; ?>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
             </div>
 
         <?php endif; ?>
-
     </div>
+
+    <div id="detailsModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 backdrop-blur-sm p-4">
+        <div class="bg-white rounded-lg shadow-2xl w-full max-w-2xl transform transition-all scale-100">
+            
+            <div class="bg-gray-800 text-white px-6 py-4 rounded-t-lg flex justify-between items-center">
+                <div>
+                    <h3 class="text-lg font-bold">Detalhes da Mensagem</h3>
+                    <span id="modalDate" class="text-xs text-gray-400 font-mono"></span>
+                </div>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-white text-2xl font-bold">&times;</button>
+            </div>
+
+            <div class="p-6 max-h-[70vh] overflow-y-auto">
+                <div id="modalStatus" class="mb-4"></div>
+                <div id="modalContent" class="space-y-4">
+                    </div>
+            </div>
+
+            <div class="bg-gray-50 px-6 py-3 rounded-b-lg text-right border-t">
+                <button onclick="closeModal()" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded transition">
+                    Fechar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const modal = document.getElementById('detailsModal');
+        const modalContent = document.getElementById('modalContent');
+        const modalDate = document.getElementById('modalDate');
+        const modalStatus = document.getElementById('modalStatus');
+
+        function openModal(data, date, status) {
+            // Limpa conteúdo anterior
+            modalContent.innerHTML = '';
+            
+            // Define data e status
+            modalDate.innerText = new Date(date).toLocaleString('pt-BR');
+            const statusColor = status === 'Enviado' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
+            modalStatus.innerHTML = `<span class="px-3 py-1 rounded text-xs font-bold uppercase ${statusColor}">E-mail: ${status}</span>`;
+
+            // Gera os campos dinamicamente
+            for (const [key, value] of Object.entries(data)) {
+                const label = key.replace(/_/g, ' ').toUpperCase();
+                const safeValue = value ? value.toString() : '-'; // Garante string
+                
+                // Cria o HTML para cada campo
+                const div = document.createElement('div');
+                div.className = 'border-b border-gray-100 pb-2';
+                div.innerHTML = `
+                    <label class="block text-xs text-gray-400 font-bold mb-1">${label}</label>
+                    <div class="text-gray-800 text-sm whitespace-pre-wrap leading-relaxed">${safeValue}</div>
+                `;
+                modalContent.appendChild(div);
+            }
+
+            // Mostra o modal
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeModal() {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        // Fecha ao clicar fora
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) closeModal();
+        });
+        
+        // Fecha com ESC
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeModal();
+        });
+    </script>
+
 </body>
 </html>
