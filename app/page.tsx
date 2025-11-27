@@ -1,98 +1,323 @@
 // app/page.tsx
 
+"use client";
+
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
-// Importamos o novo componente inteligente
+import { 
+  Moon, 
+  Sun, 
+  Menu, 
+  X, 
+  Layout, 
+  ShoppingCart, 
+  ArrowRight, 
+  Github, 
+  Linkedin, 
+  Instagram, 
+  Mail,
+  Palette,
+  Layers
+} from 'lucide-react';
+
+// Seus componentes reais
 import ProjectsArea from '../components/ProjectsArea';
 import DynamicForm from '../components/DynamicForm';
+import { API_BASE_URL } from '../utils/api'; // Certifique-se de importar sua BASE_URL
 
 export default function Home() {
-  // Removemos toda aquela lógica de getProjects daqui. 
-  // A página agora é estática e leve.
+  // --- ESTADOS ---
+  const [isDarkMode, setIsDarkMode] = useState(true);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  
+  // Estado para dados do Backend (Logo, Título do site, etc)
+  const [siteSettings, setSiteSettings] = useState<{ logo_url?: string; site_name?: string } | null>(null);
+
+  // --- EFEITOS ---
+  
+  // 1. Detectar Scroll
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 20);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // 2. Buscar Configurações (Logo) do Backend
+  useEffect(() => {
+    async function fetchSettings() {
+      try {
+        // Ajuste o endpoint conforme seu backend real. Ex: api_settings.php
+        const res = await fetch(`${API_BASE_URL}/api_settings.php`); 
+        if (res.ok) {
+            const data = await res.json();
+            setSiteSettings(data);
+        }
+      } catch (error) {
+        console.error("Erro ao buscar configurações do site:", error);
+      }
+    }
+    fetchSettings();
+  }, []);
+
+  const toggleTheme = () => setIsDarkMode(!isDarkMode);
+
+  // --- PALETA DE CORES ---
+  const theme = {
+    bg: isDarkMode ? 'bg-[#023047]' : 'bg-[#D4F0FC]',
+    text: isDarkMode ? 'text-white' : 'text-[#023047]',
+    textMuted: isDarkMode ? 'text-gray-300' : 'text-gray-600',
+    cardBg: isDarkMode ? 'bg-[#034061]' : 'bg-white',
+    border: isDarkMode ? 'border-white/10' : 'border-[#023047]/10',
+    navBg: isDarkMode 
+      ? (scrolled ? 'bg-[#023047]/95 backdrop-blur-md shadow-lg' : 'bg-transparent') 
+      : (scrolled ? 'bg-[#D4F0FC]/95 backdrop-blur-md shadow-lg' : 'bg-transparent'),
+  };
 
   return (
-    <div className="min-h-screen bg-brand-dark text-white selection:bg-brand-green selection:text-brand-dark">
+    <div className={`min-h-screen transition-colors duration-300 ${theme.bg} ${theme.text} font-sans selection:bg-[#2ECC40] selection:text-[#023047]`}>
       
-      {/* HEADER */}
-      <header className="w-full py-5 px-4 sm:px-8 border-b border-white/10 bg-brand-dark/95 sticky top-0 z-50 backdrop-blur-md">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <div className="flex flex-col leading-none">
-            <span className="text-2xl font-bold tracking-widest text-white font-rajdhani uppercase">André</span>
-            <div className="flex items-center gap-2">
-              <div className="h-0.5 w-6 bg-brand-green"></div>
-              <span className="text-xl font-bold tracking-widest text-brand-blue font-rajdhani uppercase">Ventura</span>
-            </div>
+      {/* --- HEADER --- */}
+      <header className={`fixed top-0 w-full z-50 transition-all duration-300 border-b ${scrolled ? theme.border : 'border-transparent'} ${theme.navBg}`}>
+        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+          
+          {/* LOGO: Prioriza a imagem do backend, senão usa texto */}
+          <div className="flex flex-col leading-none cursor-pointer group">
+            {siteSettings?.logo_url ? (
+                <div className="relative h-12 w-40">
+                    <Image 
+                        src={`${API_BASE_URL}${siteSettings.logo_url}`} 
+                        alt={siteSettings.site_name || "André Ventura"} 
+                        fill
+                        className="object-contain object-left"
+                    />
+                </div>
+            ) : (
+                <>
+                    <span className={`text-2xl font-bold tracking-widest uppercase font-rajdhani group-hover:text-[#2ECC40] transition-colors`}>
+                    André
+                    </span>
+                    <div className="flex items-center gap-2">
+                    <div className="h-0.5 w-6 bg-[#2ECC40]"></div>
+                    <span className="text-xl font-bold tracking-widest text-[#89D6FB] font-rajdhani uppercase">
+                        Ventura
+                    </span>
+                    </div>
+                </>
+            )}
           </div>
 
-          <div className="flex items-center gap-6">
-            <div className="hidden md:block text-right text-xs sm:text-sm text-brand-blue font-roboto">
-              <p>+55 (31) 9 9190-4415</p>
-              <p>contato@asventura.com.br</p>
-            </div>
-            <a href="#contact" className="bg-brand-green hover:bg-white hover:text-brand-dark text-brand-dark font-bold py-3 px-5 rounded shadow-[0_0_15px_rgba(46,204,64,0.4)] transition-all uppercase text-xs sm:text-sm tracking-wide font-rajdhani">
+          {/* NAV DESKTOP */}
+          <nav className="hidden md:flex items-center gap-8">
+            <a href="#services" className={`text-sm font-medium hover:text-[#2ECC40] transition-colors uppercase tracking-wider font-roboto`}>Especialidades</a>
+            <a href="#projects" className={`text-sm font-medium hover:text-[#2ECC40] transition-colors uppercase tracking-wider font-roboto`}>Portfólio</a>
+            
+            <button 
+              onClick={toggleTheme}
+              className={`p-2 rounded-full transition-colors ${isDarkMode ? 'bg-white/10 hover:bg-white/20 text-[#FF8D37]' : 'bg-[#023047]/10 hover:bg-[#023047]/20 text-[#5D3FD3]'}`}
+            >
+              {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
+            </button>
+
+            <a href="#contact" className="bg-[#2ECC40] hover:bg-white hover:text-[#023047] text-[#023047] font-bold py-2.5 px-6 rounded shadow-[0_0_15px_rgba(46,204,64,0.4)] transition-all uppercase text-sm tracking-wide font-rajdhani">
+              Fale Conosco
+            </a>
+          </nav>
+
+          {/* MENU MOBILE TOGGLE */}
+          <div className="flex items-center gap-4 md:hidden">
+            <button onClick={toggleTheme} className={isDarkMode ? 'text-[#FF8D37]' : 'text-[#5D3FD3]'}>
+                {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
+            </button>
+            <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="text-[#2ECC40]">
+              {isMenuOpen ? <X size={28} /> : <Menu size={28} />}
+            </button>
+          </div>
+        </div>
+
+        {/* MOBILE DROPDOWN */}
+        {isMenuOpen && (
+          <div className={`md:hidden absolute top-20 left-0 w-full ${theme.cardBg} border-b ${theme.border} p-6 shadow-2xl flex flex-col gap-4`}>
+            <a href="#services" onClick={() => setIsMenuOpen(false)} className="py-2 border-b border-white/5">Especialidades</a>
+            <a href="#projects" onClick={() => setIsMenuOpen(false)} className="py-2 border-b border-white/5">Portfólio</a>
+            <a href="#contact" onClick={() => setIsMenuOpen(false)} className="bg-[#2ECC40] text-[#023047] font-bold py-3 text-center rounded mt-2">
               Fale Conosco
             </a>
           </div>
-        </div>
+        )}
       </header>
 
       <main className="w-full">
         
-        {/* HERO SECTION */}
-        <section className="relative w-full h-[600px] flex items-center justify-start overflow-hidden">
-          <div className="absolute inset-0 z-0 bg-brand-dark">
-            <Image 
-              src="/images/landing.jpg" 
-              alt="Background Tech" 
-              fill
-              priority
-              className="object-cover opacity-20 mix-blend-overlay"
-              unoptimized
-            />
-            <div className="absolute inset-0 bg-gradient-to-r from-brand-dark via-brand-dark/80 to-transparent"></div>
-          </div>
+        {/* --- HERO SECTION --- */}
+        <section className="relative pt-32 pb-20 lg:pt-48 lg:pb-32 px-6 overflow-hidden min-h-[600px] flex items-center">
+          {/* Background FX */}
+          <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#5D3FD3]/20 rounded-full blur-[100px] -z-10 translate-x-1/2 -translate-y-1/2 pointer-events-none"></div>
+          <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-[#2ECC40]/10 rounded-full blur-[80px] -z-10 -translate-x-1/2 translate-y-1/2 pointer-events-none"></div>
 
-          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-8 w-full">
-            <span className="text-brand-orange font-bold font-roboto text-sm tracking-wider uppercase mb-4 block border-l-4 border-brand-orange pl-3">
-              André Ventura | Full Stack Developer
-            </span>
-            <h1 className="text-4xl sm:text-6xl font-semibold text-white leading-[1.1] max-w-3xl font-rajdhani">
-              Transformando suas ideias em <br/>
-              experiências digitais <span className="text-brand-green">incríveis.</span>
-            </h1>
-            <p className="mt-6 text-brand-light/80 text-lg max-w-xl font-light font-montserrat">
-              Soluções de engenharia robustas, interfaces modernas e automação inteligente para escalar o seu negócio.
-            </p>
+          <div className="max-w-7xl mx-auto w-full grid lg:grid-cols-2 gap-12 items-center z-10">
+            <div className="space-y-6">
+              
+              <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full border ${isDarkMode ? 'border-[#2ECC40]/30 bg-[#2ECC40]/10 text-[#2ECC40]' : 'border-[#5D3FD3]/30 bg-[#5D3FD3]/10 text-[#5D3FD3]'} text-xs font-bold uppercase tracking-wider w-fit`}>
+                <span className="relative flex h-2 w-2">
+                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isDarkMode ? 'bg-[#2ECC40]' : 'bg-[#5D3FD3]'}`}></span>
+                  <span className={`relative inline-flex rounded-full h-2 w-2 ${isDarkMode ? 'bg-[#2ECC40]' : 'bg-[#5D3FD3]'}`}></span>
+                </span>
+                Disponível para novos projetos
+              </div>
+              
+              <h1 className="text-4xl sm:text-6xl font-bold leading-[1.1] font-rajdhani">
+                Transformando suas ideias em <br />
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#2ECC40] to-[#89D6FB]">
+                   experiências digitais.
+                </span>
+              </h1>
+              
+              <p className={`text-lg ${theme.textMuted} max-w-xl font-light leading-relaxed font-montserrat`}>
+                Especialista em criação de sites e e-commerces. Utilizo a potência do <strong>WordPress</strong> e a flexibilidade do <strong>Elementor</strong> para entregar resultados profissionais que vendem.
+              </p>
+
+              <div className="flex flex-col sm:flex-row gap-4 pt-4">
+                <a href="#projects" className="bg-[#2ECC40] hover:bg-[#25a535] text-[#023047] font-bold py-4 px-8 rounded flex items-center justify-center gap-2 transition-transform hover:-translate-y-1 shadow-[0_10px_20px_-10px_rgba(46,204,64,0.5)] uppercase font-rajdhani">
+                  Ver Projetos <ArrowRight size={20} />
+                </a>
+                <a href="#contact" className={`border ${isDarkMode ? 'border-white/20 hover:bg-white/5' : 'border-[#023047]/20 hover:bg-[#023047]/5'} font-medium py-4 px-8 rounded flex items-center justify-center transition-colors uppercase font-rajdhani`}>
+                  Solicitar Orçamento
+                </a>
+              </div>
+
+              {/* Tecnologias */}
+              <div className="pt-8 border-t border-white/10 mt-8">
+                <p className="text-xs uppercase tracking-widest mb-4 opacity-60">Ferramentas que domino</p>
+                <div className="flex flex-wrap gap-6 opacity-80">
+                   <span className="font-bold text-lg flex items-center gap-2"><Layout size={20} className="text-[#2ECC40]"/> WordPress</span>
+                   <span className="font-bold text-lg flex items-center gap-2"><Layers size={20} className="text-[#5D3FD3]"/> Elementor & Divi</span>
+                   <span className="font-bold text-lg flex items-center gap-2"><ShoppingCart size={20} className="text-[#FF8D37]"/> WooCommerce</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Imagem Hero */}
+            <div className="relative hidden lg:block h-[500px]">
+               <div className={`relative z-10 rounded-2xl overflow-hidden border ${theme.border} shadow-2xl group h-full`}>
+                 <div className="absolute inset-0 bg-[#023047]/40 group-hover:bg-transparent transition-all duration-500 z-10"></div>
+                 <Image 
+                    src="/images/landing.jpg" 
+                    alt="André Ventura - Web Developer" 
+                    fill
+                    className="object-cover"
+                    priority
+                    style={{ backgroundColor: '#023047' }}
+                 />
+               </div>
+               <div className="absolute -bottom-6 -right-6 w-full h-full border-2 border-[#2ECC40] rounded-2xl -z-10"></div>
+            </div>
           </div>
         </section>
 
-        {/* PROJETOS (AGORA DINÂMICO NO CLIENTE) */}
-        <section id="projects" className="py-24 bg-brand-dark relative border-t border-white/5">
-          <div className="max-w-7xl mx-auto px-4 sm:px-8">
+        {/* --- SERVIÇOS --- */}
+        <section id="services" className={`py-24 ${isDarkMode ? 'bg-[#034061]/30' : 'bg-white'}`}>
+           <div className="max-w-7xl mx-auto px-6">
+              <div className="text-center mb-16">
+                 <h2 className="text-3xl sm:text-5xl font-bold font-rajdhani uppercase mb-4">
+                    O que eu faço
+                 </h2>
+                 <div className="h-1 w-24 bg-[#2ECC40] mx-auto rounded-full"></div>
+              </div>
+
+              <div className="grid md:grid-cols-3 gap-8">
+                 {/* WP */}
+                 <div className={`p-8 rounded-2xl border ${theme.border} ${theme.cardBg} hover:border-[#2ECC40] transition-all hover:-translate-y-2 group`}>
+                    <div className="w-14 h-14 bg-[#2ECC40]/20 rounded-lg flex items-center justify-center text-[#2ECC40] mb-6">
+                        <Layout size={32} />
+                    </div>
+                    <h3 className="text-xl font-bold mb-3 font-rajdhani uppercase">Sites Institucionais</h3>
+                    <p className={`text-sm ${theme.textMuted} leading-relaxed`}>
+                        Criação de sites profissionais com <strong>WordPress</strong>. Entrega rápida, painel fácil de gerenciar e layouts modernos.
+                    </p>
+                 </div>
+
+                 {/* Woo */}
+                 <div className={`p-8 rounded-2xl border ${theme.border} ${theme.cardBg} hover:border-[#5D3FD3] transition-all hover:-translate-y-2 group`}>
+                    <div className="w-14 h-14 bg-[#5D3FD3]/20 rounded-lg flex items-center justify-center text-[#5D3FD3] mb-6">
+                        <ShoppingCart size={32} />
+                    </div>
+                    <h3 className="text-xl font-bold mb-3 font-rajdhani uppercase">Lojas WooCommerce</h3>
+                    <p className={`text-sm ${theme.textMuted} leading-relaxed`}>
+                        Transforme visitantes em clientes. Implementação completa de <strong>WooCommerce</strong> com integração de pagamentos e correios.
+                    </p>
+                 </div>
+
+                 {/* Builders */}
+                 <div className={`p-8 rounded-2xl border ${theme.border} ${theme.cardBg} hover:border-[#FF8D37] transition-all hover:-translate-y-2 group`}>
+                    <div className="w-14 h-14 bg-[#FF8D37]/20 rounded-lg flex items-center justify-center text-[#FF8D37] mb-6">
+                        <Palette size={32} />
+                    </div>
+                    <h3 className="text-xl font-bold mb-3 font-rajdhani uppercase">Elementor & Divi</h3>
+                    <p className={`text-sm ${theme.textMuted} leading-relaxed`}>
+                        Domínio total dos principais construtores visuais do mercado. Liberdade total para editar o conteúdo do seu site.
+                    </p>
+                 </div>
+              </div>
+           </div>
+        </section>
+
+        {/* --- PROJETOS --- */}
+        <section id="projects" className="py-24 relative overflow-hidden">
+          <div className="max-w-7xl mx-auto px-6">
             <div className="flex items-center gap-4 mb-16">
-              <h2 className="text-3xl font-bold text-white uppercase whitespace-nowrap font-rajdhani">
-                Nossos Projetos
-              </h2>
-              <div className="h-px w-full bg-gradient-to-r from-brand-green to-transparent opacity-50 mt-1"></div>
+               <h2 className="text-3xl font-bold uppercase whitespace-nowrap font-rajdhani">
+                 Meus Projetos
+               </h2>
+               <div className="h-px w-full bg-gradient-to-r from-[#2ECC40] to-transparent opacity-50 mt-1"></div>
             </div>
             
-            {/* AQUI ENTRA O COMPONENTE QUE BUSCA OS DADOS */}
             <ProjectsArea />
             
           </div>
         </section>
 
-        {/* CONTATO */}
-        <section id="contact" className="py-24 bg-[#012233] border-t border-white/5">
-          <div className="max-w-3xl mx-auto px-4">
-            <h2 className="text-4xl font-bold text-center mb-10 text-white uppercase font-rajdhani">
-              Vamos conversar?
-            </h2>
-            
-            {/* Passando o SLUG que você criou no Admin */}
-            <DynamicForm slug="contact-form-main" />
-            
-          </div>
+        {/* --- CONTATO --- */}
+        <section id="contact" className={`py-20 border-t ${theme.border}`}>
+            <div className="max-w-4xl mx-auto px-6">
+                <div className={`rounded-3xl p-8 md:p-12 ${isDarkMode ? 'bg-gradient-to-br from-[#034061] to-[#023047]' : 'bg-white shadow-xl'} border ${theme.border}`}>
+                    <div className="text-center mb-10">
+                        <h2 className="text-3xl font-bold font-rajdhani uppercase mb-4">Vamos conversar?</h2>
+                        <p className={theme.textMuted}>Preencha o formulário abaixo para solicitar um orçamento.</p>
+                    </div>
+
+                    <DynamicForm slug="contact-form-main" />
+
+                </div>
+            </div>
         </section>
+
+        {/* --- FOOTER --- */}
+        <footer className={`py-12 border-t ${theme.border} ${isDarkMode ? 'bg-[#011a28]' : 'bg-[#D4F0FC]'}`}>
+            <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6">
+                
+                <div className="flex flex-col items-center md:items-start">
+                    <span className="text-2xl font-bold tracking-widest font-rajdhani uppercase flex gap-2">
+                        André <span className="text-[#2ECC40]">Ventura</span>
+                    </span>
+                    <p className={`text-xs mt-2 ${theme.textMuted}`}>Desenvolvimento Web & WordPress</p>
+                </div>
+
+                <div className="flex gap-6">
+                    <a href="https://github.com/asventura96" target="_blank" rel="noreferrer" className={`${theme.textMuted} hover:text-[#2ECC40] transition-colors`}>
+                        <Github size={20} />
+                    </a>
+                    <a href="mailto:contato@asventura.com.br" className={`${theme.textMuted} hover:text-[#2ECC40] transition-colors`}>
+                        <Mail size={20} />
+                    </a>
+                    <a href="#" className={`${theme.textMuted} hover:text-[#2ECC40] transition-colors`}>
+                        <Linkedin size={20} />
+                    </a>
+                </div>
+            </div>
+        </footer>
 
       </main>
     </div>
