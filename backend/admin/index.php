@@ -1,16 +1,46 @@
 <?php
 // backend/admin/index.php
 
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
-
 session_start();
-require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/includes/Layout.php';
-require_once __DIR__ . '/includes/Components.php';
 
-// Verifica Login
+// Caminho absoluto para a raiz do sistema
+$baseDir = __DIR__;
+
+// --- AUTOMAÇÃO DE INCLUDE (Corrige Casing Windows/Linux) ---
+function require_smart($path) {
+    // 1. Tenta o caminho exato
+    if (file_exists($path)) {
+        require_once $path;
+        return;
+    }
+
+    // 2. Se falhar, tenta achar o arquivo ignorando maiúsculas/minúsculas
+    $dir = dirname($path);
+    $filename = basename($path);
+    
+    if (is_dir($dir)) {
+        $files = scandir($dir);
+        foreach ($files as $file) {
+            if (strtolower($file) === strtolower($filename)) {
+                require_once $dir . '/' . $file;
+                return;
+            }
+        }
+    }
+
+    // 3. Se nada funcionar, erro fatal com debug
+    die("<h1>ERRO CRÍTICO DE DEPLOY</h1>
+         <p>O sistema não encontrou o arquivo: <strong>" . htmlspecialchars(basename($path)) . "</strong></p>
+         <p>Caminho buscado: $path</p>
+         <p>Verifique se a pasta <strong>includes</strong> foi enviada para o servidor.</p>");
+}
+
+// Carrega as dependências usando a função inteligente
+require_once __DIR__ . '/../config.php';
+require_smart(__DIR__ . '/includes/Layout.php');
+require_smart(__DIR__ . '/includes/Components.php');
+
+// Verifica se está logado
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     header('Location: login.php');
     exit;
