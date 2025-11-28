@@ -35,7 +35,11 @@ jobs:
         run: |
           mkdir -p dist
           # Copia o site Next.js
-          cp -r out/* dist/
+          cp -r out/* dist/ || echo "out/ vazio ou inexistente"
+
+          mkdir -p dist/images
+          cp -r public/images/* dist/images/ 2>/dev/null || echo "Sem imagens em public/images"
+          cp -r public/* dist/ 2>/dev/null || echo "Outros arquivos públicos"
           
           # Copia o backend da raiz
           cp backend/*.php dist/
