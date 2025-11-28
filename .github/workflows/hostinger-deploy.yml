@@ -42,7 +42,7 @@ jobs:
           cp -r public/* dist/ 2>/dev/null || echo "Outros arquivos públicos"
           
           # Copia o backend da raiz
-          cp backend/*.php dist/
+          cp -r backend/* dist/
           
           # Cria a pasta admin e copia os arquivos dela
           mkdir -p dist/admin
