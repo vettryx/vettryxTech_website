@@ -295,7 +295,7 @@ export default function Home() {
               André <span className="text-[#2ECC40]">Ventura</span>
             </span>
             <p className={`text-xs mt-2 ${theme.textMuted}`}>Desenvolvimento Web & WordPress</p>
-            <p className={`text-xs mt-1 ${theme.textMuted} opacity-60`}>© 2025 1Todos os direitos reservados.</p>
+            <p className={`text-xs mt-1 ${theme.textMuted} opacity-60`}>© 2025 Todos os direitos reservados.</p>
           </div>
           <div className="flex gap-6">
             <a href="https://github.com/asventura96" target="_blank" rel="noreferrer" className={`${theme.textMuted} hover:text-[#2ECC40] transition-colors`}>
