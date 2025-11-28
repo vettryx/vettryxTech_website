@@ -59,4 +59,4 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y lftp
-          lftp -e "set ssl:verify-certificate no; open ${{ secrets.FTP_SERVER }}; user ${{ secrets.FTP_USERNAME }} ${{ secrets.FTP_PASSWORD }}; mirror -R --verbose --parallel=2 ./dist ./test; bye"
+          lftp -e "set ssl:verify-certificate no; open ${{ secrets.FTP_SERVER }}; user ${{ secrets.FTP_USERNAME }} ${{ secrets.FTP_PASSWORD }}; mirror -R --verbose --parallel=2 ./dist /public_html; bye"
