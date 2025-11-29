@@ -21,7 +21,7 @@ import {
 
 import ProjectsArea from '../components/ProjectsArea';
 import DynamicForm from '../components/DynamicForm';
-import { API_BASE_URL } from '../utils/api';
+import { API_BASE_URL, IMG_BASE_URL } from '../utils/api';
 
 export default function Home() {
   const [isDarkMode, setIsDarkMode] = useState(true);
@@ -88,7 +88,7 @@ export default function Home() {
             ) : siteSettings?.site_logo ? (
               <div className="relative h-12 w-48">
                 <Image
-                  src={`${API_BASE_URL}${siteSettings.site_logo}`}
+                  src={`${IMG_BASE_URL}${siteSettings.site_logo}`}
                   alt={siteSettings.site_title || 'André Ventura'}
                   fill
                   className="object-contain object-left"
@@ -204,7 +204,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* IMAGEM DO HERO - CORRIGIDA */}
+          {/* IMAGEM DO HERO */}
           <div className="relative hidden lg:block h-[500px]">
             <div className={`relative z-10 rounded-2xl overflow-hidden border ${theme.border} shadow-2xl group h-full`}>
               <div className="absolute inset-0 bg-[#023047]/40 group-hover:bg-transparent transition-all duration-500 z-10" />
