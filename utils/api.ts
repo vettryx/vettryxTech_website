@@ -35,6 +35,8 @@ export async function getProjects(): Promise<Project[]> {
     if (!response.ok) throw new Error('Erro API');
     return await response.json();
   } catch (error) {
+    // CORREÇÃO 1: Usar a variável error para limpar o warning e ajudar no debug
+    console.error("Erro ao buscar projetos:", error);
     return [];
   }
 }
@@ -48,13 +50,14 @@ export async function submitContactForm(data: ContactForm): Promise<{ success: b
     });
     return await response.json();
   } catch (error) {
+    // CORREÇÃO 2: Usar a variável error aqui também
+    console.error("Erro ao enviar formulário:", error);
     return { success: false, message: 'Erro de conexão.' };
   }
 }
 
 export async function getSettings(): Promise<SiteSettings> {
   try {
-    // CORREÇÃO AQUI: Removido 'revalidate: 60' que causava o conflito
     const response = await fetch(`${API_BASE_URL}/api_settings.php`, { 
       cache: 'no-store'
     });
@@ -62,7 +65,13 @@ export async function getSettings(): Promise<SiteSettings> {
     const json = await response.json();
     return json.data || {};
   } catch (error) {
-    console.error("Erro ao buscar settings", error);
-    return { site_title: 'André Ventura', site_description: '', site_logo: '', site_favicon: '' };
+    console.error("Erro ao buscar settings:", error);
+    // Retorna vazio para evitar quebrar a página, mas loga o erro acima
+    return { 
+        site_title: 'André Ventura', 
+        site_description: '', 
+        site_logo: '', 
+        site_favicon: '' 
+    };
   }
 }
