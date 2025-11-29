@@ -8,23 +8,31 @@ const rajdhani = Rajdhani({ subsets: ["latin"], weight: ["300","400","500","600"
 const montserrat = Montserrat({ subsets: ["latin"], weight: ["300","400","500","600","700"], variable: "--font-montserrat", display: "swap" });
 const roboto = Roboto({ subsets: ["latin"], weight: ["300","400","500","700"], variable: "--font-roboto", display: "swap" });
 
-// Metadata dinâmico com fallback
 export async function generateMetadata() {
   try {
-    // O fetch continua na API (CORRETO)
-    const res = await fetch(`${API_BASE_URL}/api_settings.php`, { next: { revalidate: 60 } });
+    // Adicionei um timestamp na requisição para garantir que o Next não cacheie o JSON infinitamente
+    const res = await fetch(`${API_BASE_URL}/api_settings.php?t=${Date.now()}`, { next: { revalidate: 60 } });
     const json = await res.json();
     
     if (json.success && json.data) {
-      // 2. CORREÇÃO AQUI: O favicon é imagem, usa a URL da raiz (IMG_BASE_URL)
-      const favicon = json.data.site_favicon 
-        ? `${IMG_BASE_URL}${json.data.site_favicon}` 
+      // TRUQUE 1: Removemos barras duplicadas caso IMG_BASE_URL termine com / e o favicon comece com /
+      const cleanBaseUrl = IMG_BASE_URL.replace(/\/$/, "");
+      const cleanPath = json.data.site_favicon.startsWith('/') ? json.data.site_favicon : `/${json.data.site_favicon}`;
+      
+      // TRUQUE 2: Adicionamos ?v=timestamp no final da imagem. 
+      // Isso obriga o navegador a baixar a imagem nova e ignorar o cache antigo.
+      const faviconUrl = json.data.site_favicon 
+        ? `${cleanBaseUrl}${cleanPath}?v=${Date.now()}` 
         : "/favicon.ico";
 
       return {
         title: json.data.site_title || "André Ventura",
         description: json.data.site_description || "Desenvolvimento Web & WordPress",
-        icons: { icon: favicon },
+        icons: {
+          icon: faviconUrl,
+          shortcut: faviconUrl, // Alguns navegadores preferem 'shortcut'
+          apple: faviconUrl,    // Para iPhone/iPad
+        },
       };
     }
   } catch (e) {
