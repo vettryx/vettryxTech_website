@@ -68,7 +68,7 @@ export async function getSettings(): Promise<SiteSettings> {
     console.error("Erro ao buscar settings:", error);
     // Retorna vazio para evitar quebrar a página, mas loga o erro acima
     return { 
-        site_title: 'André Ventura', 
+        site_title: '', 
         site_description: '', 
         site_logo: '', 
         site_favicon: '' 
