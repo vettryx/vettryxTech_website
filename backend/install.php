@@ -17,8 +17,7 @@ if (file_exists(__DIR__ . '/config.php')) {
 echo "<h1>🛠️ Iniciando Instalação e Limpeza...</h1>";
 
 try {
-    // --- CRIAR TABELAS (RESUMIDO) ---
-    // Mantendo a estrutura existente das tabelas principais...
+    // --- CRIAR TABELAS PRINCIPAIS ---
     $pdo->exec("CREATE TABLE IF NOT EXISTS admins (id INT AUTO_INCREMENT PRIMARY KEY, email VARCHAR(255) NOT NULL UNIQUE, password VARCHAR(255) NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
     $pdo->exec("CREATE TABLE IF NOT EXISTS projects (id INT AUTO_INCREMENT PRIMARY KEY, title VARCHAR(255) NOT NULL, description TEXT, image_url VARCHAR(255), link VARCHAR(255), created_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
     $pdo->exec("CREATE TABLE IF NOT EXISTS forms (id INT AUTO_INCREMENT PRIMARY KEY, title VARCHAR(255) NOT NULL, slug VARCHAR(255) NOT NULL UNIQUE, recipient_email VARCHAR(255) NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
@@ -28,6 +27,42 @@ try {
     // TABELA SETTINGS
     $pdo->exec("CREATE TABLE IF NOT EXISTS settings (setting_key VARCHAR(50) PRIMARY KEY, setting_value TEXT)");
     echo "✅ Tabelas do banco de dados verificadas.<br>";
+
+    // --- ATUALIZAÇÃO AUTOMÁTICA DA TABELA ADMINS (2FA e Recuperação) ---
+    // Função auxiliar local para adicionar colunas se não existirem
+    if (!function_exists('addColumnIfNotExists')) {
+        function addColumnIfNotExists($pdo, $table, $column, $definition) {
+            try {
+                $stmt = $pdo->prepare("SHOW COLUMNS FROM `$table` LIKE ?");
+                $stmt->execute([$column]);
+                if ($stmt->rowCount() == 0) {
+                    $pdo->exec("ALTER TABLE `$table` ADD COLUMN $column $definition");
+                    echo "✅ Coluna <strong>$column</strong> adicionada em $table.<br>";
+                }
+            } catch (PDOException $e) {
+                echo "⚠️ Erro ao tentar adicionar $column: " . $e->getMessage() . "<br>";
+            }
+        }
+    }
+
+    echo "<hr><h3>🔄 Verificando estrutura para 2FA e Recuperação...</h3>";
+    
+    // 1. Token de recuperação de senha
+    addColumnIfNotExists($pdo, 'admins', 'reset_token_hash', 'VARCHAR(64) NULL DEFAULT NULL AFTER password');
+    
+    // 2. Expiração do token
+    addColumnIfNotExists($pdo, 'admins', 'reset_token_expires_at', 'DATETIME NULL DEFAULT NULL AFTER reset_token_hash');
+    
+    // 3. Segredo do 2FA (Google Authenticator)
+    addColumnIfNotExists($pdo, 'admins', 'two_factor_secret', 'VARCHAR(255) NULL DEFAULT NULL AFTER reset_token_expires_at');
+    
+    // 4. Status do 2FA (Ligado/Desligado)
+    addColumnIfNotExists($pdo, 'admins', 'two_factor_enabled', 'TINYINT(1) DEFAULT 0 AFTER two_factor_secret');
+    
+    // 5. Códigos de recuperação (Backup codes)
+    addColumnIfNotExists($pdo, 'admins', 'two_factor_recovery_codes', 'TEXT NULL DEFAULT NULL AFTER two_factor_enabled');
+    
+    echo "✅ Estrutura de segurança atualizada.<br>";
 
     // --- CONFIGURAÇÕES PADRÃO (LIMPAS) ---
     $defaults = [
@@ -40,20 +75,20 @@ try {
         'contact_phone' => '',
         'contact_address' => '',
         
-        // Redes Sociais (NOVO: JSON Vazio)
+        // Redes Sociais
         'social_links' => '[]',
         
-        // Integrações (Mantive Recaptcha pois é útil para formulários públicos)
+        // Integrações
         'recaptcha_site_key' => '',
         'recaptcha_secret' => ''
     ];
     
-    // Removemos configurações antigas de SMTP se existirem para não sujar o banco
+    // Removemos configurações antigas
     $keysToRemove = ['smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'social_linkedin', 'social_instagram', 'social_github', 'social_whatsapp'];
     foreach ($keysToRemove as $key) {
         $pdo->prepare("DELETE FROM settings WHERE setting_key = ?")->execute([$key]);
     }
-    echo "🧹 Configurações antigas (SMTP/Sociais individuais) limpas.<br>";
+    echo "🧹 Configurações antigas limpas.<br>";
     
     // Insere os novos defaults
     $stmtCheck = $pdo->prepare("SELECT count(*) FROM settings WHERE setting_key = ?");
@@ -68,7 +103,7 @@ try {
     }
     echo "✅ Configurações padrão atualizadas.<br>";
 
-    // --- ADMIN INICIAL (MANTIDO) ---
+    // --- ADMIN INICIAL ---
     $email = getenv('DEFAULT_ADMIN_EMAIL') ?: 'admin@admin.com';
     $pass  = getenv('DEFAULT_ADMIN_PASS')  ?: 'admin';
     $check = $pdo->prepare("SELECT id FROM admins WHERE email = ?");
