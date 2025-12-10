@@ -12,7 +12,7 @@ require 'includes/Components.php';
 
 // Verifica Login
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
-    header('Location: login.php');
+    header('Location: auth/login.php');
     exit;
 }
 
@@ -116,7 +116,7 @@ Layout::header('Dashboard');
             <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Geral</p>
         </a>
 
-        <a href="security.php" class="group bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 hover:border-green-500 hover:ring-1 hover:ring-green-500 transition cursor-pointer flex flex-col items-center text-center">
+        <a href="auth/security.php" class="group bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 hover:border-green-500 hover:ring-1 hover:ring-green-500 transition cursor-pointer flex flex-col items-center text-center">
             <div class="bg-green-50 dark:bg-slate-700 text-green-500 p-3 rounded-full mb-3 group-hover:scale-110 transition">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
