@@ -2,28 +2,87 @@
 // backend/admin/includes/Layout.php
 
 class Layout {
-    
-    public static function header($title = 'Painel Admin') {
-        // 1. BUSCAR CONFIGURAÇÕES GERAIS (Logo, Favicon, Título)
-        global $pdo; // Usa a conexão que já vem dos arquivos principais
-        
-        $settings = [];
-        try {
-            // Busca configurações se a tabela existir
-            $stmt = $pdo->query("SELECT * FROM settings");
-            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-                $settings[$row['setting_key']] = $row['setting_value'];
+    // 1. CENTRAL DE DESIGN (Onde você define as cores para o site TODO)
+    private static function getThemeConfig() {
+        return "
+            tailwind.config = {
+                darkMode: 'class',
+                theme: {
+                    extend: {
+                        colors: {
+                            brand: {
+                                dark:   '#023047', // Azul Fundo
+                                green:  '#2ECC40', // Verde Principal
+                                purple: '#5D3FD3', 
+                                orange: '#FF8D37',
+                                blue:   '#89D6FB',
+                                light:  '#D4F0FC',
+                                white:  '#ffffff'
+                            }
+                        },
+                        fontFamily: {
+                            sans: ['Inter', 'sans-serif'],
+                            rajdhani: ['Rajdhani', 'sans-serif']
+                        }
+                    }
+                }
             }
-        } catch (Exception $e) { 
-            // Fallback silencioso caso a tabela ainda não exista
-        }
+        ";
+    }
 
-        // Define valores padrão se não houver no banco
-        $site_title = $settings['site_title'] ?? 'André Ventura';
-        $favicon    = $settings['site_favicon'] ?? ''; 
-        $logo       = $settings['site_logo'] ?? '';
+    // 2. CABEÇALHO PARA LOGIN/SENHA (Sem menu, centralizado)
+    public static function authHeader($title = 'Acesso Admin') {
+        ?>
+        <!DOCTYPE html>
+        <html lang="pt-BR">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title><?php echo htmlspecialchars($title); ?></title>
+            <script src="https://cdn.tailwindcss.com"></script>
+            <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+            <script><?php echo self::getThemeConfig(); ?></script>
+            <style>[x-cloak] { display: none !important; }</style>
+        </head>
+        <body class="bg-brand-dark h-screen w-full flex items-center justify-center relative overflow-hidden font-sans text-white">
+            
+            <div class="absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none">
+                <div class="absolute -top-[10%] -left-[10%] w-[50%] h-[50%] bg-brand-green/10 rounded-full blur-[120px]"></div>
+                <div class="absolute bottom-[10%] -right-[10%] w-[40%] h-[50%] bg-blue-500/10 rounded-full blur-[120px]"></div>
+            </div>
+
+            <div class="relative z-10 w-full max-w-sm mx-4 bg-white/10 backdrop-blur-md border border-white/10 p-8 rounded-2xl shadow-2xl transition-all duration-300">
+        <?php
+    }
+
+    public static function authFooter() {
+        ?>
+                <div class="mt-6 text-center">
+                    <p class="text-xs text-slate-400">&copy; <?php echo date('Y'); ?> VettryxTech</p>
+                </div>
+            </div> </body>
+        </html>
+        <?php
+    }
+
+    // 3. CABEÇALHO DO DASHBOARD (Com Menu e Navbar)
+    public static function header($title = 'Painel Admin') {
+        global $pdo;
         
-        // Pega email da sessão
+        // Configurações e Dados do Usuário
+        $site_title = 'André Ventura';
+        $favicon = ''; 
+        $logo = '';
+        
+        // Tenta buscar do banco (fallback seguro)
+        try {
+            $stmt = $pdo->query("SELECT setting_key, setting_value FROM settings");
+            $settings = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+            if(isset($settings['site_title'])) $site_title = $settings['site_title'];
+            if(isset($settings['site_favicon'])) $favicon = $settings['site_favicon'];
+            if(isset($settings['site_logo'])) $logo = $settings['site_logo'];
+        } catch (Exception $e) {}
+
         $user_email = $_SESSION['admin_email'] ?? 'Admin';
 
         echo '<!DOCTYPE html>
@@ -34,45 +93,19 @@ class Layout {
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>' . htmlspecialchars($title) . ' - ' . htmlspecialchars($site_title) . '</title>
-            
             ' . ($favicon ? '<link rel="icon" href="'.$favicon.'">' : '') . '
             
             <script src="https://cdn.tailwindcss.com"></script>
             <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+            <script>' . self::getThemeConfig() . '</script>
             
-            <script>
-                tailwind.config = {
-                    darkMode: "class", // Ativa modo escuro via classe CSS
-                    theme: {
-                        extend: {
-                            colors: {
-                                brand: {
-                                    dark:   "#023047", //  Azul Profundo (Fundo Dark)
-                                    green:  "#2ECC40", //  Verde Vibrante (Ações/Sucesso)
-                                    purple: "#5D3FD3", // [cite: 3] Roxo (Detalhes/Hover)
-                                    orange: "#FF8D37", // [cite: 4] Laranja (Avisos)
-                                    blue:   "#89D6FB", // [cite: 6] Azul Claro (Infos)
-                                    light:  "#D4F0FC", //  Azul Gelo (Fundo Light)
-                                    white:  "#ffffff"
-                                }
-                            },
-                            fontFamily: {
-                                sans: ["Inter", "sans-serif"],
-                                rajdhani: ["Rajdhani", "sans-serif"] // Se quiser usar a fonte do site
-                            }
-                        }
-                    }
-                }
-            </script>
             <style>
                 [x-cloak] { display: none !important; }
-                /* Transição suave entre temas */
                 body, div, nav, button, input, textarea { transition: background-color 0.3s, border-color 0.3s, color 0.3s; }
             </style>
         </head>
         
-        <body class="bg-brand-light dark:bg-brand-dark text-slate-800 dark:text-brand-light min-h-screen font-sans flex flex-col transition-colors duration-300">
-        ';
+        <body class="bg-brand-light dark:bg-brand-dark text-slate-800 dark:text-brand-light min-h-screen font-sans flex flex-col transition-colors duration-300">';
         
         self::navbar($user_email, $logo);
         
@@ -83,7 +116,7 @@ class Layout {
         echo '</main>
         <footer class="bg-white dark:bg-slate-900/50 border-t border-slate-200 dark:border-slate-700 mt-auto backdrop-blur-md">
             <div class="max-w-7xl mx-auto py-6 px-4 text-center">
-                <p class="text-sm text-slate-500 dark:text-slate-400">&copy; ' . date('Y') . ' Painel Administrativo - André Ventura</p>
+                <p class="text-sm text-slate-500 dark:text-slate-400">&copy; ' . date('Y') . ' Painel Administrativo</p>
             </div>
         </footer>
         </body>
@@ -91,7 +124,6 @@ class Layout {
     }
 
     private static function navbar($email, $logoUrl) {
-        // Avatar gerado com as cores da sua marca
         $avatar = "https://ui-avatars.com/api/?name=$email&background=2ECC40&color=fff&bold=true";
         
         echo '
@@ -99,12 +131,10 @@ class Layout {
             <div class="max-w-7xl mx-auto px-4">
                 <div class="flex justify-between h-20 items-center">
                     
-                    <div class="flex items-center gap-3">
-                        ';
+                    <div class="flex items-center gap-3">';
                         if ($logoUrl) {
                             echo '<img src="'.$logoUrl.'" class="h-10 w-auto object-contain">';
                         } else {
-                            // Fallback se não tiver logo: Texto estilizado
                             echo '<div class="flex flex-col leading-none">
                                     <span class="text-xl font-bold tracking-widest text-brand-dark dark:text-white uppercase">André</span>
                                     <span class="text-sm font-bold tracking-widest text-brand-green uppercase">Ventura</span>
@@ -115,6 +145,8 @@ class Layout {
                     <div class="flex items-center gap-4 text-sm font-medium">
                         <div class="hidden md:flex gap-6 mr-4">
                             <a href="index.php" class="text-slate-600 dark:text-slate-300 hover:text-brand-green dark:hover:text-brand-green transition">Dashboard</a>
+                            <a href="clients.php" class="text-slate-600 dark:text-slate-300 hover:text-brand-green dark:hover:text-brand-green transition">Clientes</a>
+                            <a href="contracts.php" class="text-slate-600 dark:text-slate-300 hover:text-brand-green dark:hover:text-brand-green transition">Contratos</a>
                             <a href="projects.php" class="text-slate-600 dark:text-slate-300 hover:text-brand-green dark:hover:text-brand-green transition">Projetos</a>
                             <a href="forms.php" class="text-slate-600 dark:text-slate-300 hover:text-brand-green dark:hover:text-brand-green transition">Formulários</a>
                         </div>
@@ -137,7 +169,7 @@ class Layout {
                                 <a href="users.php" class="block px-4 py-2 text-slate-700 dark:text-slate-300 hover:bg-brand-light dark:hover:bg-slate-700 hover:text-brand-dark dark:hover:text-white transition">Gerenciar Equipe</a>
                                 <a href="settings.php" class="block px-4 py-2 text-slate-700 dark:text-slate-300 hover:bg-brand-light dark:hover:bg-slate-700 hover:text-brand-dark dark:hover:text-white transition">Configurações</a>
                                 <div class="border-t border-slate-100 dark:border-slate-700 my-1"></div>
-                                <a href="logout.php" class="block px-4 py-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 font-bold transition">Sair do Sistema</a>
+                                <a href="auth/logout.php" class="block px-4 py-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 font-bold transition">Sair do Sistema</a>
                             </div>
                         </div>
                     </div>

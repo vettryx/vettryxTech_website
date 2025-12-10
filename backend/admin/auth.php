@@ -6,7 +6,7 @@ session_start();
 
 // Verifica sessão
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
-    header("Location: login.php");
+    header("Location: auth/login.php");
     exit;
 }
 ?>
