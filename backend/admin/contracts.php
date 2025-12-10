@@ -1,6 +1,5 @@
 <?php
 // backend/admin/contracts.php
-
 session_start();
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/includes/Layout.php';
@@ -18,20 +17,16 @@ $msgType = '';
 // --- LÓGICA DE GERAÇÃO DE NÚMERO (AAAA/0000) ---
 function generateContractNumber($pdo) {
     $year = date('Y');
-    // Busca o último contrato deste ano
     $stmt = $pdo->prepare("SELECT contract_number FROM contracts WHERE contract_number LIKE ? ORDER BY id DESC LIMIT 1");
     $stmt->execute(["$year/%"]);
     $last = $stmt->fetchColumn();
 
     if ($last) {
-        // Se achou 2025/0005, pega o 5 e soma 1
         $parts = explode('/', $last);
         $seq = intval($parts[1]) + 1;
     } else {
-        // Se não tem nenhum, começa do 1
         $seq = 1;
     }
-    // Formata com 4 dígitos (0001)
     return $year . '/' . str_pad($seq, 4, '0', STR_PAD_LEFT);
 }
 
@@ -45,23 +40,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $plan_id = $_POST['plan_id'];
             $payment_method_id = $_POST['payment_method_id'];
             $domain_url = $_POST['domain_url'];
-            $monthly_price = str_replace(',', '.', $_POST['monthly_price']); // Aceita vírgula
+            $monthly_price = str_replace(',', '.', $_POST['monthly_price']);
             $due_day = $_POST['due_day'];
             $issue_date = $_POST['issue_date'];
             $start_date = $_POST['start_date'];
             $status = $_POST['status'];
 
             if ($action === 'create') {
-                // Gera número
+                // REMOVIDO: Lógica de Token e PDF
                 $contract_number = generateContractNumber($pdo);
-                $token = bin2hex(random_bytes(32)); // Token único para o cliente acessar depois
 
-                $sql = "INSERT INTO contracts (contract_number, client_id, plan_id, payment_method_id, domain_url, monthly_price, due_day, issue_date, start_date, status, token) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                // SQL corrigido: Não tenta mais salvar 'token'
+                $sql = "INSERT INTO contracts (contract_number, client_id, plan_id, payment_method_id, domain_url, monthly_price, due_day, issue_date, start_date, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
                 $stmt = $pdo->prepare($sql);
-                $stmt->execute([$contract_number, $client_id, $plan_id, $payment_method_id, $domain_url, $monthly_price, $due_day, $issue_date, $start_date, $status, $token]);
+                $stmt->execute([$contract_number, $client_id, $plan_id, $payment_method_id, $domain_url, $monthly_price, $due_day, $issue_date, $start_date, $status]);
                 $message = "Contrato $contract_number criado com sucesso!";
             } else {
-                // Edição (Não muda o número do contrato)
                 $id = $_POST['id'];
                 $sql = "UPDATE contracts SET client_id=?, plan_id=?, payment_method_id=?, domain_url=?, monthly_price=?, due_day=?, issue_date=?, start_date=?, status=? WHERE id=?";
                 $stmt = $pdo->prepare($sql);
@@ -82,12 +76,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// --- BUSCAR DADOS PARA O FORMULÁRIO ---
+// --- BUSCAR DADOS ---
 $clients = $pdo->query("SELECT id, name FROM clients ORDER BY name ASC")->fetchAll();
 $plans = $pdo->query("SELECT * FROM plans WHERE active = 1")->fetchAll();
 $payment_methods = $pdo->query("SELECT * FROM payment_methods WHERE active = 1")->fetchAll();
 
-// --- BUSCAR CONTRATOS (COM JOIN PARA TRAZER OS NOMES) ---
 $sqlList = "SELECT c.*, cl.name as client_name, p.name as plan_name 
             FROM contracts c 
             JOIN clients cl ON c.client_id = cl.id 
@@ -273,8 +266,8 @@ Layout::header('Gestão de Contratos');
 document.addEventListener('alpine:init', () => {
     Alpine.data('contractManager', () => ({
         showModal: false, isEdit: false,
-        plans: <?php echo json_encode($plans); ?>, // Passa os planos para o JS para pegar o preço
-        form: { id: '', client_id: '', plan_id: '', payment_method_id: '', domain_url: '', monthly_price: '', due_day: 10, issue_date: '', start_date: '', status: 'draft' },
+        plans: <?php echo json_encode($plans); ?>,
+        form: { id: '', client_id: '', plan_id: '', payment_method_id: 1, domain_url: '', monthly_price: '', due_day: 10, issue_date: '', start_date: '', status: 'draft' },
         
         openModal() {
             this.isEdit = false;
@@ -288,12 +281,9 @@ document.addEventListener('alpine:init', () => {
             this.showModal = true;
         },
         updatePrice(e) {
-            // Quando seleciona um plano, busca o preço dele
             const planId = e.target.value;
             const plan = this.plans.find(p => p.id == planId);
-            if(plan) {
-                this.form.monthly_price = plan.price;
-            }
+            if(plan) this.form.monthly_price = plan.price;
         }
     }));
 });
