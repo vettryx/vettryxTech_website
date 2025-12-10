@@ -1,8 +1,8 @@
 <?php
-// backend/admin/security.php
+// backend/admin/auth/security.php
 session_start();
-require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../vendor/autoload.php';
+require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../vendor/autoload.php';
 
 use RobThree\Auth\TwoFactorAuth;
 use RobThree\Auth\Providers\Qr\QRServerProvider;

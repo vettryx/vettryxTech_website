@@ -1,7 +1,7 @@
 <?php
-// backend/admin/forgot_password.php
+// backend/admin/auth/forgot_password.php
 session_start();
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../../config.php';
 
 // Se já estiver logado, redireciona
 if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true) {

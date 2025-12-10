@@ -1,5 +1,5 @@
 <?php
-// backend/admin/logout.php
+// backend/admin/auth/logout.php
 
 session_start();
 session_destroy();

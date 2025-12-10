@@ -1,7 +1,7 @@
 <?php
-// backend/admin/reset_password.php
+// backend/admin/auth/reset_password.php
 session_start();
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../../config.php';
 
 $token = $_GET['token'] ?? '';
 $validToken = false;
