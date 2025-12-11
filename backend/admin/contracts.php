@@ -6,7 +6,6 @@ require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/includes/Layout.php';
 require_once __DIR__ . '/includes/Components.php';
 
-// Segurança
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     header('Location: auth/login.php');
     exit;
@@ -15,76 +14,66 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 $message = '';
 $msgType = '';
 
-// --- GERAÇÃO DE NÚMERO SEQUENCIAL (AAAA/0000) ---
+// --- GERAÇÃO DE NÚMERO SEQUENCIAL ---
 function generateContractNumber($pdo) {
     $year = date('Y');
     $stmt = $pdo->prepare("SELECT contract_number FROM contracts WHERE contract_number LIKE ? ORDER BY id DESC LIMIT 1");
     $stmt->execute(["$year/%"]);
     $last = $stmt->fetchColumn();
-
-    if ($last) {
-        $parts = explode('/', $last);
-        $seq = intval($parts[1]) + 1;
-    } else {
-        $seq = 1;
-    }
+    $seq = $last ? intval(explode('/', $last)[1]) + 1 : 1;
     return $year . '/' . str_pad($seq, 4, '0', STR_PAD_LEFT);
 }
 
-// --- LÓGICA DE SALVAMENTO (CRUD) ---
+// --- BACKEND (Salvar) ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
     try {
         if ($action === 'create' || $action === 'edit') {
-            // Coleta dados do formulário
             $client_id = $_POST['client_id'];
             $plan_id = $_POST['plan_id'];
             $payment_method_id = $_POST['payment_method_id'];
             $domain_url = $_POST['domain_url'];
-            $monthly_price = str_replace(',', '.', $_POST['monthly_price']); // Converte 100,00 para 100.00
+            $monthly_price = str_replace(',', '.', $_POST['monthly_price']);
             $due_day = $_POST['due_day'];
             $issue_date = $_POST['issue_date'];
             $start_date = $_POST['start_date'];
             $status = $_POST['status'];
+            $obs = $_POST['observations']; // NOVO CAMPO v1.3
 
             if ($action === 'create') {
                 $contract_number = generateContractNumber($pdo);
-                
-                // INSERE NO BANCO (Sem token, sem assinatura, apenas dados)
-                $sql = "INSERT INTO contracts (contract_number, client_id, plan_id, payment_method_id, domain_url, monthly_price, due_day, issue_date, start_date, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                // SQL ATUALIZADO COM 'observations'
+                $sql = "INSERT INTO contracts (contract_number, client_id, plan_id, payment_method_id, domain_url, monthly_price, due_day, issue_date, start_date, status, observations) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
                 $stmt = $pdo->prepare($sql);
-                $stmt->execute([$contract_number, $client_id, $plan_id, $payment_method_id, $domain_url, $monthly_price, $due_day, $issue_date, $start_date, $status]);
-                
-                $message = "Contrato $contract_number registrado com sucesso!";
+                $stmt->execute([$contract_number, $client_id, $plan_id, $payment_method_id, $domain_url, $monthly_price, $due_day, $issue_date, $start_date, $status, $obs]);
+                $message = "Contrato $contract_number criado!";
             } else {
                 $id = $_POST['id'];
-                $sql = "UPDATE contracts SET client_id=?, plan_id=?, payment_method_id=?, domain_url=?, monthly_price=?, due_day=?, issue_date=?, start_date=?, status=? WHERE id=?";
+                $sql = "UPDATE contracts SET client_id=?, plan_id=?, payment_method_id=?, domain_url=?, monthly_price=?, due_day=?, issue_date=?, start_date=?, status=?, observations=? WHERE id=?";
                 $stmt = $pdo->prepare($sql);
-                $stmt->execute([$client_id, $plan_id, $payment_method_id, $domain_url, $monthly_price, $due_day, $issue_date, $start_date, $status, $id]);
-                
-                $message = "Dados do contrato atualizados!";
+                $stmt->execute([$client_id, $plan_id, $payment_method_id, $domain_url, $monthly_price, $due_day, $issue_date, $start_date, $status, $obs, $id]);
+                $message = "Contrato atualizado!";
             }
             $msgType = 'success';
 
         } elseif ($action === 'delete') {
             $id = $_POST['id'];
             $pdo->prepare("DELETE FROM contracts WHERE id = ?")->execute([$id]);
-            $message = "Contrato removido do sistema.";
+            $message = "Contrato removido.";
             $msgType = 'success';
         }
     } catch (PDOException $e) {
-        $message = "Erro ao salvar: " . $e->getMessage();
+        $message = "Erro: " . $e->getMessage();
         $msgType = 'error';
     }
 }
 
-// --- BUSCAR DADOS PARA LISTAGEM E SELECTS ---
+// --- BUSCAR DADOS ---
 $clients = $pdo->query("SELECT id, name FROM clients ORDER BY name ASC")->fetchAll();
 $plans = $pdo->query("SELECT * FROM plans WHERE active = 1")->fetchAll();
 $payment_methods = $pdo->query("SELECT * FROM payment_methods WHERE active = 1")->fetchAll();
 
-// Busca lista completa
 $sqlList = "SELECT c.*, cl.name as client_name, p.name as plan_name 
             FROM contracts c 
             JOIN clients cl ON c.client_id = cl.id 
@@ -100,7 +89,7 @@ Layout::header('Gestão de Contratos');
     <div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
         <div>
             <h1 class="text-3xl font-bold text-brand-dark dark:text-white">Contratos</h1>
-            <p class="text-slate-500 dark:text-slate-400">Controle de vigências e renovações.</p>
+            <p class="text-slate-500 dark:text-slate-400">Gerencie planos e vigências.</p>
         </div>
         <button @click="openModal()" class="bg-brand-green hover:bg-green-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg hover:shadow-green-500/30 transition flex items-center gap-2">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
@@ -119,11 +108,10 @@ Layout::header('Gestão de Contratos');
             <table class="w-full text-left border-collapse">
                 <thead>
                     <tr class="bg-slate-50 dark:bg-slate-700/50 text-slate-500 dark:text-slate-300 text-xs uppercase font-bold border-b border-slate-100 dark:border-slate-700">
-                        <th class="p-4">Nº</th>
+                        <th class="p-4">Nº Contrato</th>
                         <th class="p-4">Cliente</th>
-                        <th class="p-4">Plano / Domínio</th>
+                        <th class="p-4">Plano / Site</th>
                         <th class="p-4">Valor</th>
-                        <th class="p-4">Vencimento</th>
                         <th class="p-4">Status</th>
                         <th class="p-4 text-right">Ações</th>
                     </tr>
@@ -137,25 +125,25 @@ Layout::header('Gestão de Contratos');
                             <div class="font-bold text-brand-dark dark:text-white"><?php echo htmlspecialchars($contract['plan_name']); ?></div>
                             <a href="<?php echo htmlspecialchars($contract['domain_url']); ?>" target="_blank" class="text-xs text-slate-400 hover:text-brand-green truncate block max-w-[200px]"><?php echo htmlspecialchars($contract['domain_url']); ?></a>
                         </td>
-                        <td class="p-4 font-mono">R$ <?php echo number_format($contract['monthly_price'], 2, ',', '.'); ?></td>
-                        <td class="p-4">Dia <?php echo $contract['due_day']; ?></td>
+                        <td class="p-4">R$ <?php echo number_format($contract['monthly_price'], 2, ',', '.'); ?></td>
                         <td class="p-4">
-                            <?php 
-                                $statusMap = [
-                                    'draft' => ['Rascunho', 'bg-gray-100 text-gray-600'],
-                                    'active' => ['Ativo', 'bg-green-100 text-green-700'],
-                                    'suspended' => ['Suspenso', 'bg-red-100 text-red-700'],
-                                    'cancelled' => ['Cancelado', 'bg-slate-200 text-slate-500 line-through']
-                                ];
-                                $st = $statusMap[$contract['status']] ?? ['Desconhecido', 'bg-gray-100'];
-                            ?>
-                            <span class="px-2 py-1 rounded text-xs font-bold uppercase <?php echo $st[1]; ?>"><?php echo $st[0]; ?></span>
+                            <span class="px-2 py-1 rounded text-xs font-bold uppercase <?php echo $contract['status'] == 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'; ?>">
+                                <?php echo $contract['status']; ?>
+                            </span>
                         </td>
                         <td class="p-4 text-right flex justify-end gap-2">
-                            <button @click='editContract(<?php echo json_encode($contract); ?>)' class="text-slate-400 hover:text-brand-blue p-1" title="Editar">
+                            
+                            <a href="contract_view.php?id=<?php echo $contract['id']; ?>" class="text-slate-400 hover:text-purple-600 p-1" title="Ver Detalhes e Aditivos">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                            </a>
+
+                            <button @click='editContract(<?php echo json_encode($contract); ?>)' class="text-slate-400 hover:text-blue-500 p-1" title="Editar">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" /></svg>
                             </button>
-                            <form method="POST" onsubmit="return confirm('Tem certeza que deseja apagar este contrato?');">
+                            
+                            <form method="POST" onsubmit="return confirm('Excluir este contrato?');">
                                 <input type="hidden" name="action" value="delete">
                                 <input type="hidden" name="id" value="<?php echo $contract['id']; ?>">
                                 <button class="text-slate-400 hover:text-red-500 p-1" title="Excluir">
@@ -181,7 +169,7 @@ Layout::header('Gestão de Contratos');
                 <div class="bg-brand-dark px-4 py-3 sm:px-6 flex justify-between items-center">
                     <div>
                         <h3 class="text-lg leading-6 font-medium text-white" x-text="isEdit ? 'Editar Contrato' : 'Novo Contrato'"></h3>
-                        <p x-show="!isEdit" class="text-xs text-brand-blue">Número automático (Ex: <?php echo date('Y'); ?>/000X)</p>
+                        <p x-show="!isEdit" class="text-xs text-brand-blue">Número será gerado automaticamente</p>
                     </div>
                     <button @click="showModal = false" class="text-slate-400 hover:text-white">✕</button>
                 </div>
@@ -215,7 +203,7 @@ Layout::header('Gestão de Contratos');
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div>
-                            <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Domínio do Site</label>
+                            <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Domínio (URL)</label>
                             <input type="url" name="domain_url" x-model="form.domain_url" required placeholder="https://..." class="w-full px-3 py-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white focus:border-brand-green outline-none">
                         </div>
                         <div>
@@ -226,7 +214,7 @@ Layout::header('Gestão de Contratos');
 
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                         <div>
-                            <label class="block text-xs font-bold text-slate-500 mb-1">Pagamento Via</label>
+                            <label class="block text-xs font-bold text-slate-500 mb-1">Pagamento</label>
                             <select name="payment_method_id" x-model="form.payment_method_id" required class="w-full px-3 py-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white">
                                 <?php foreach($payment_methods as $pm): ?>
                                     <option value="<?php echo $pm['id']; ?>"><?php echo htmlspecialchars($pm['name']); ?></option>
@@ -238,30 +226,35 @@ Layout::header('Gestão de Contratos');
                             <input type="number" min="1" max="31" name="due_day" x-model="form.due_day" required class="w-full px-3 py-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white">
                         </div>
                         <div>
-                            <label class="block text-xs font-bold text-slate-500 mb-1">Início Vigência</label>
+                            <label class="block text-xs font-bold text-slate-500 mb-1">Início</label>
                             <input type="date" name="start_date" x-model="form.start_date" required class="w-full px-3 py-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white">
                         </div>
                     </div>
                     
                     <div class="grid grid-cols-2 gap-4 mb-4">
                          <div>
-                            <label class="block text-xs font-bold text-slate-500 mb-1">Data Emissão</label>
+                            <label class="block text-xs font-bold text-slate-500 mb-1">Emissão</label>
                             <input type="date" name="issue_date" x-model="form.issue_date" required class="w-full px-3 py-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white">
                         </div>
                         <div>
-                            <label class="block text-xs font-bold text-slate-500 mb-1">Status Atual</label>
+                            <label class="block text-xs font-bold text-slate-500 mb-1">Status</label>
                             <select name="status" x-model="form.status" class="w-full px-3 py-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white font-bold">
-                                <option value="draft">Rascunho (Preparando)</option>
-                                <option value="active" class="text-green-600">Ativo (Vigente)</option>
+                                <option value="draft">Rascunho</option>
+                                <option value="active" class="text-green-600">Ativo</option>
                                 <option value="suspended" class="text-red-600">Suspenso</option>
                                 <option value="cancelled">Cancelado</option>
                             </select>
                         </div>
                     </div>
 
+                    <div class="border-t pt-4 dark:border-slate-700">
+                        <label class="block text-xs font-bold text-slate-500 mb-1">Observações do Contrato</label>
+                        <textarea name="observations" x-model="form.observations" rows="2" class="w-full px-3 py-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white" placeholder="Anotações internas..."></textarea>
+                    </div>
+
                     <div class="mt-6 flex justify-end gap-3">
                         <button type="button" @click="showModal = false" class="px-4 py-2 border rounded text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700">Cancelar</button>
-                        <button type="submit" class="px-4 py-2 bg-brand-green text-white font-bold rounded hover:bg-green-600 transition">Salvar Registro</button>
+                        <button type="submit" class="px-4 py-2 bg-brand-green text-white font-bold rounded hover:bg-green-600 transition">Salvar</button>
                     </div>
                 </form>
             </div>
@@ -274,13 +267,12 @@ document.addEventListener('alpine:init', () => {
     Alpine.data('contractManager', () => ({
         showModal: false, isEdit: false,
         plans: <?php echo json_encode($plans); ?>,
-        form: { id: '', client_id: '', plan_id: '', payment_method_id: 1, domain_url: '', monthly_price: '', due_day: 10, issue_date: '', start_date: '', status: 'draft' },
+        form: { id: '', client_id: '', plan_id: '', payment_method_id: 1, domain_url: '', monthly_price: '', due_day: 10, issue_date: '', start_date: '', status: 'draft', observations: '' },
         
         openModal() {
             this.isEdit = false;
             const today = new Date().toISOString().split('T')[0];
-            // Reseta formulário para novo
-            this.form = { id: '', client_id: '', plan_id: '', payment_method_id: 1, domain_url: '', monthly_price: '', due_day: 10, issue_date: today, start_date: today, status: 'draft' };
+            this.form = { id: '', client_id: '', plan_id: '', payment_method_id: 1, domain_url: '', monthly_price: '', due_day: 10, issue_date: today, start_date: today, status: 'draft', observations: '' };
             this.showModal = true;
         },
         editContract(contract) {
