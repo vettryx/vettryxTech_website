@@ -14,7 +14,7 @@ if (file_exists(__DIR__ . '/config.php')) {
     die("❌ Erro Crítico: O arquivo <strong>config.php</strong> não foi encontrado.<br>Caminho atual: " . __DIR__);
 }
 
-echo "<h1>🛠️ Atualizando e Corrigindo Banco de Dados...</h1>";
+echo "<h1>🛠️ Instalação/Atualização do Sistema (v1.3.0)</h1>";
 
 try {
     // FUNÇÃO PARA ADICIONAR COLUNAS QUE FALTAM (ESSENCIAL)
@@ -32,30 +32,74 @@ try {
     }
 
     // =================================================================================
-    // PARTE 1: TABELAS ORIGINAIS
+    // PARTE 1: ESTRUTURA BÁSICA DO SISTEMA (SITE & ADMIN)
     // =================================================================================
     
-    $pdo->exec("CREATE TABLE IF NOT EXISTS admins (id INT AUTO_INCREMENT PRIMARY KEY, email VARCHAR(255) NOT NULL UNIQUE, password VARCHAR(255) NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
-    $pdo->exec("CREATE TABLE IF NOT EXISTS projects (id INT AUTO_INCREMENT PRIMARY KEY, title VARCHAR(255) NOT NULL, description TEXT, image_url VARCHAR(255), link VARCHAR(255), created_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
-    $pdo->exec("CREATE TABLE IF NOT EXISTS forms (id INT AUTO_INCREMENT PRIMARY KEY, title VARCHAR(255) NOT NULL, slug VARCHAR(255) NOT NULL UNIQUE, recipient_email VARCHAR(255) NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
-    $pdo->exec("CREATE TABLE IF NOT EXISTS form_fields (id INT AUTO_INCREMENT PRIMARY KEY, form_id INT NOT NULL, label VARCHAR(255) NOT NULL, name VARCHAR(255) NOT NULL, type VARCHAR(50) NOT NULL, options TEXT NULL, placeholder VARCHAR(255) NULL, is_required BOOLEAN DEFAULT 0, order_index INT DEFAULT 999, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (form_id) REFERENCES forms(id) ON DELETE CASCADE)");
-    $pdo->exec("CREATE TABLE IF NOT EXISTS form_submissions (id INT AUTO_INCREMENT PRIMARY KEY, form_id INT NOT NULL, data JSON NOT NULL, email_status VARCHAR(50) DEFAULT 'Pendente', created_at DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (form_id) REFERENCES forms(id) ON DELETE CASCADE)");
+    // Tabela de Admins
+    $pdo->exec("CREATE TABLE IF NOT EXISTS admins (
+        id INT AUTO_INCREMENT PRIMARY KEY, 
+        email VARCHAR(255) NOT NULL UNIQUE, 
+        password VARCHAR(255) NOT NULL, 
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )");
+
+    // Tabela de Projetos (Portfólio)
+    $pdo->exec("CREATE TABLE IF NOT EXISTS projects (
+        id INT AUTO_INCREMENT PRIMARY KEY, 
+        title VARCHAR(255) NOT NULL, 
+        description TEXT, 
+        image_url VARCHAR(255), 
+        link VARCHAR(255), 
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )");
+
+    // Tabelas de Formulários
+    $pdo->exec("CREATE TABLE IF NOT EXISTS forms (
+        id INT AUTO_INCREMENT PRIMARY KEY, 
+        title VARCHAR(255) NOT NULL, 
+        slug VARCHAR(255) NOT NULL UNIQUE, 
+        recipient_email VARCHAR(255) NOT NULL, 
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )");
+    $pdo->exec("CREATE TABLE IF NOT EXISTS form_fields (
+        id INT AUTO_INCREMENT PRIMARY KEY, 
+        form_id INT NOT NULL, 
+        label VARCHAR(255) NOT NULL, 
+        name VARCHAR(255) NOT NULL, 
+        type VARCHAR(50) NOT NULL, 
+        options TEXT NULL, 
+        placeholder VARCHAR(255) NULL, 
+        is_required BOOLEAN DEFAULT 0, 
+        order_index INT DEFAULT 999, 
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP, 
+        FOREIGN KEY (form_id) REFERENCES forms(id) ON DELETE CASCADE
+    )");
+    $pdo->exec("CREATE TABLE IF NOT EXISTS form_submissions (
+        id INT AUTO_INCREMENT PRIMARY KEY, 
+        form_id INT NOT NULL, 
+        data JSON NOT NULL, 
+        email_status VARCHAR(50) DEFAULT 'Pendente', 
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP, 
+        FOREIGN KEY (form_id) REFERENCES forms(id) ON DELETE CASCADE
+    )");
+
+    // Configurações Gerais
     $pdo->exec("CREATE TABLE IF NOT EXISTS settings (setting_key VARCHAR(50) PRIMARY KEY, setting_value TEXT)");
     
-    // --- CORREÇÕES DA TABELA ADMINS (2FA) ---
+    // --- ATUALIZAÇÕES DE SEGURANÇA (2FA & RECUPERAÇÃO) ---
     addColumnIfNotExists($pdo, 'admins', 'reset_token_hash', 'VARCHAR(64) NULL DEFAULT NULL AFTER password');
     addColumnIfNotExists($pdo, 'admins', 'reset_token_expires_at', 'DATETIME NULL DEFAULT NULL AFTER reset_token_hash');
     addColumnIfNotExists($pdo, 'admins', 'two_factor_secret', 'VARCHAR(255) NULL DEFAULT NULL AFTER reset_token_expires_at');
     addColumnIfNotExists($pdo, 'admins', 'two_factor_enabled', 'TINYINT(1) DEFAULT 0 AFTER two_factor_secret');
     addColumnIfNotExists($pdo, 'admins', 'two_factor_recovery_codes', 'TEXT NULL DEFAULT NULL AFTER two_factor_enabled');
 
-    echo "✅ Tabelas base verificadas.<br>";
+    echo "✅ Tabelas do Sistema Base verificadas.<br>";
 
     // =================================================================================
-    // PARTE 2: GESTÃO DE CLIENTES E CONTRATOS
+    // PARTE 2: GESTÃO COMERCIAL (CRM, CONTRATOS, FINANCEIRO)
     // =================================================================================
 
-    // 1. Planos
+    // 1. Planos de Venda
     $pdo->exec("CREATE TABLE IF NOT EXISTS plans (
         id INT AUTO_INCREMENT PRIMARY KEY,
         name VARCHAR(100) NOT NULL,
@@ -64,7 +108,7 @@ try {
         active TINYINT(1) DEFAULT 1,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )");
-    // Seed Planos
+    // Seed Planos (Só insere se a tabela estiver vazia)
     if ($pdo->query("SELECT count(*) FROM plans")->fetchColumn() == 0) {
         $pdo->exec("INSERT INTO plans (name, price, description) VALUES 
         ('Plano Blindagem Essencial', 89.90, 'Atualização Segura, Monitoramento Uptime, Backup Semanal'),
@@ -85,7 +129,7 @@ try {
         ('Cartão de Crédito', 'Link de pagamento enviado mensalmente')");
     }
 
-    // 3. Clientes
+    // 3. Clientes (Endereço completo + Observações)
     $pdo->exec("CREATE TABLE IF NOT EXISTS clients (
         id INT AUTO_INCREMENT PRIMARY KEY,
         type ENUM('PF', 'PJ') DEFAULT 'PJ',
@@ -102,8 +146,11 @@ try {
         neighborhood VARCHAR(100),
         city VARCHAR(100),
         state VARCHAR(2),
+        observations TEXT NULL, -- v1.3.0
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )");
+    // Garante que o campo observations exista (caso a tabela tenha sido criada na v1.2)
+    addColumnIfNotExists($pdo, 'clients', 'observations', 'TEXT NULL AFTER state');
 
     // 4. Contratos
     $pdo->exec("CREATE TABLE IF NOT EXISTS contracts (
@@ -118,27 +165,44 @@ try {
         issue_date DATE NOT NULL,
         start_date DATE NOT NULL,
         status ENUM('draft', 'active', 'suspended', 'cancelled') DEFAULT 'draft',
-        token VARCHAR(64) UNIQUE, -- Coluna Essencial
+        token VARCHAR(64) UNIQUE, -- v1.2 Fix
+        observations TEXT NULL, -- v1.3.0
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (client_id) REFERENCES clients(id),
         FOREIGN KEY (plan_id) REFERENCES plans(id),
         FOREIGN KEY (payment_method_id) REFERENCES payment_methods(id)
     )");
-
-    // --- CORREÇÃO CRÍTICA DO ERRO DE TOKEN ---
-    // Se a tabela já existia sem o token, isso vai consertar agora:
+    // Atualizações de colunas v1.2 e v1.3
     addColumnIfNotExists($pdo, 'contracts', 'token', 'VARCHAR(64) UNIQUE AFTER status');
+    addColumnIfNotExists($pdo, 'contracts', 'observations', 'TEXT NULL AFTER token');
 
-    echo "✅ Estrutura de Gestão (Clientes/Contratos) verificada e corrigida.<br>";
+    // 5. Aditivos Contratuais (v1.3.0 - NOVIDADE)
+    // Tabela para registrar alterações de valor, reajustes, etc.
+    $pdo->exec("CREATE TABLE IF NOT EXISTS contract_addendums (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        contract_id INT NOT NULL,
+        type VARCHAR(50) NOT NULL, -- Ex: 'Reajuste Anual', 'Mudança de Plano'
+        description TEXT,
+        old_value DECIMAL(10, 2) NULL,
+        new_value DECIMAL(10, 2) NULL,
+        effective_date DATE NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (contract_id) REFERENCES contracts(id) ON DELETE CASCADE
+    )");
 
-    // --- Configurações Finais ---
+    echo "✅ Estrutura de Gestão Comercial (v1.3.0) verificada.<br>";
+
+    // --- CONFIGURAÇÕES DO SISTEMA ---
+    // Insere configurações padrão de multas e juros se não existirem
     $pdo->exec("INSERT IGNORE INTO settings (setting_key, setting_value) VALUES 
         ('contract_fine_percent', '2'),
         ('contract_interest_percent', '1'),
-        ('tech_hour_value', '150.00')
+        ('tech_hour_value', '150.00'),
+        ('site_title', 'Meu Site'),
+        ('social_links', '[]')
     ");
 
-    // Admin Inicial (Mantido)
+    // --- ADMIN INICIAL ---
     $email = getenv('DEFAULT_ADMIN_EMAIL') ?: 'admin@admin.com';
     $check = $pdo->prepare("SELECT id FROM admins WHERE email = ?");
     $check->execute([$email]);
@@ -146,9 +210,10 @@ try {
         $pass = getenv('DEFAULT_ADMIN_PASS') ?: 'admin';
         $hash = password_hash($pass, PASSWORD_DEFAULT);
         $pdo->prepare("INSERT INTO admins (email, password) VALUES (?, ?)")->execute([$email, $hash]);
+        echo "<hr>👤 Admin padrão criado.<br>";
     }
     
-    echo "<h2>🏁 Instalação/Correção Concluída!</h2>";
+    echo "<h2>🏁 Instalação Completa com Sucesso!</h2>";
 
 } catch (PDOException $e) {
     echo "<hr>❌ <strong>ERRO:</strong> " . $e->getMessage();
